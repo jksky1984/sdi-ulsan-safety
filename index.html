@@ -25,7 +25,7 @@
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center sm:py-8">
-    <div id="app" class="w-full max-w-md bg-white min-h-screen sm:min-h-[800px] sm:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col relative border-[6px] border-white">
+    <div id="app" class="w-full max-w-md bg-white min-h-screen sm:min-h-[800px] sm:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col relative border-[6px] border-white text-gray-800">
         
         <!-- Top Bar -->
         <nav class="samsung-blue p-5 text-white flex justify-between items-center shrink-0">
@@ -33,27 +33,30 @@
                 <i class="fas fa-shield-alt text-xl"></i>
                 <span class="font-bold tracking-tighter text-lg uppercase">S-Safety</span>
             </div>
-            <div class="flex items-center space-x-3">
-                <div id="net-indicator" class="flex items-center space-x-1.5 bg-white/10 px-3 py-1 rounded-full border border-white/20">
-                    <div class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></div>
-                    <span class="text-[10px] font-bold">INIT</span>
-                </div>
-                <button id="adminBtn" class="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-all">
-                    <i class="fas fa-cog text-sm"></i>
-                </button>
+            <div id="net-indicator" class="flex items-center space-x-1.5 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+                <div class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></div>
+                <span class="text-[10px] font-bold">INIT</span>
             </div>
         </nav>
 
         <!-- Dynamic Content Area -->
-        <main id="view-container" class="flex-grow flex flex-col p-6 overflow-y-auto">
-            <div class="flex-grow flex flex-col items-center justify-center space-y-4">
-                <div class="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
-                <p class="text-xs text-gray-400">데이터를 동기화하고 있습니다...</p>
+        <main id="view-container" class="flex-grow flex flex-col p-6 overflow-y-auto relative">
+            <div class="flex flex-col items-center justify-center h-full space-y-4">
+                <i class="fas fa-circle-notch fa-spin text-blue-600 text-3xl"></i>
+                <p class="text-sm text-gray-400 font-medium">시스템 연결 중...</p>
             </div>
         </main>
 
+        <!-- Footer Admin Entry -->
+        <footer id="footer-admin" class="p-4 bg-gray-50 border-t border-gray-100 flex justify-center">
+            <button onclick="window.openAdminModal()" class="flex items-center space-x-2 text-gray-400 hover:text-blue-600 transition-colors py-2 px-4 rounded-xl hover:bg-blue-50">
+                <i class="fas fa-user-shield text-sm"></i>
+                <span class="text-xs font-bold uppercase tracking-widest">관리자 모드 (Admin)</span>
+            </button>
+        </footer>
+
         <!-- Toast Notification -->
-        <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 px-6 py-3 bg-gray-900 text-white text-[11px] rounded-full shadow-2xl opacity-0 transition-opacity pointer-events-none z-[1000]">
+        <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 bg-gray-900 text-white text-[11px] rounded-full shadow-2xl opacity-0 transition-opacity pointer-events-none z-[1000]">
             Message
         </div>
     </div>
@@ -67,7 +70,7 @@
             <h3 class="text-lg font-bold">관리자 PIN 입력</h3>
             <input type="password" id="adminPin" placeholder="••••" maxlength="4" class="w-full p-4 bg-gray-100 rounded-2xl text-center text-2xl tracking-[0.5em] outline-none border-2 border-transparent focus:border-blue-600 transition-all">
             <div class="flex space-x-2">
-                <button id="closeAdmin" class="flex-1 py-4 text-gray-400 font-bold text-sm">취소</button>
+                <button onclick="window.closeAdminModal()" class="flex-1 py-4 text-gray-400 font-bold text-sm">취소</button>
                 <button id="authAdmin" class="flex-1 py-4 samsung-blue text-white rounded-2xl font-bold text-sm">로그인</button>
             </div>
         </div>
@@ -75,10 +78,9 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Data Definitions ---
         const DEFAULT_QUESTIONS = [
             { q: "TBM(작업 전 안전점검회의)의 설명으로 틀린 것은?", a: ["작업 위험요소 사전 파악", "작업 책임자만 참여", "보호구 착용 상태 확인", "작업 절차 공유"], c: 1 },
             { q: "화재 시 대피 방법으로 가장 적절한 것은?", a: ["엘리베이터 이용", "젖은 수건으로 코/입 가리고 대피", "옥상으로 무조건 대피", "귀중품 챙긴 후 대피"], c: 1 },
@@ -92,7 +94,9 @@
             user: null,
             questions: [...DEFAULT_QUESTIONS],
             db: null,
-            appId: typeof __app_id !== 'undefined' ? __app_id : 'samsung-sdi-safety-v2',
+            auth: null,
+            currentUser: null,
+            appId: typeof __app_id !== 'undefined' ? __app_id : 'samsung-safety-app',
             isConnected: false,
             currentQuiz: [],
             currentIndex: 0,
@@ -100,28 +104,53 @@
             adminData: []
         };
 
-        // --- Core Engine ---
-
         async function init() {
-            const timeout = new Promise((_, reject) => setTimeout(() => reject('timeout'), 4000));
             try {
-                const config = JSON.parse(__firebase_config);
-                const app = initializeApp(config);
-                const auth = getAuth(app);
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                STATE.auth = getAuth(app);
                 STATE.db = getFirestore(app);
 
-                await Promise.race([signInAnonymously(auth), timeout]);
-                
-                // Load Cloud Questions
-                const qSnap = await getDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'config', 'questions'));
-                if (qSnap.exists()) STATE.questions = qSnap.data().list;
+                const initAuth = async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(STATE.auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(STATE.auth);
+                    }
+                };
 
-                STATE.isConnected = true;
-                updateNetStatus('ONLINE', 'bg-green-500');
+                onAuthStateChanged(STATE.auth, async (u) => {
+                    STATE.currentUser = u;
+                    if (u) {
+                        STATE.isConnected = true;
+                        updateNetStatus('ONLINE', 'bg-green-500');
+                        await loadQuestions();
+                    }
+                });
+
+                await initAuth();
+
             } catch (err) {
-                console.error("Network Offline Mode:", err);
+                console.error("Initialization error:", err);
                 updateNetStatus('OFFLINE', 'bg-red-500');
-                showToast("네트워크 지연으로 오프라인 모드로 시작합니다.");
+                render();
+            }
+        }
+
+        async function loadQuestions() {
+            if (!STATE.currentUser) return;
+            try {
+                // FIXED: Document references must have even number of segments.
+                // collection(4 segments) -> doc(ID) = 6 segments.
+                const qRef = doc(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'settings', 'questions');
+                const qSnap = await getDoc(qRef);
+                if (qSnap.exists()) {
+                    const data = qSnap.data();
+                    STATE.questions = typeof data.list === 'string' ? JSON.parse(data.list) : data.list;
+                }
+            } catch (e) {
+                console.error("Question load error:", e);
+                showToast("데이터 로드 중 오류가 발생했습니다.");
             }
             render();
         }
@@ -131,18 +160,11 @@
             if (el) el.innerHTML = `<div class="w-2 h-2 rounded-full ${color}"></div><span class="text-[10px] font-bold uppercase">${text}</span>`;
         }
 
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.innerText = msg;
-            t.style.opacity = '1';
-            setTimeout(() => t.style.opacity = '0', 3000);
-        }
-
-        // --- View Logic ---
-
         function render() {
             const container = document.getElementById('view-container');
+            const footer = document.getElementById('footer-admin');
             container.innerHTML = '';
+            footer.style.display = (STATE.view === 'quiz' || STATE.view === 'admin') ? 'none' : 'flex';
 
             switch (STATE.view) {
                 case 'login': renderLogin(container); break;
@@ -161,8 +183,8 @@
                             <i class="fas fa-id-card text-3xl"></i>
                         </div>
                         <div>
-                            <h2 class="text-2xl font-bold text-gray-800 tracking-tight">안전교육 시스템</h2>
-                            <p class="text-gray-400 text-sm mt-1">성명을 입력하여 로그인을 완료하세요</p>
+                            <h2 class="text-2xl font-bold tracking-tight">안전교육 시스템</h2>
+                            <p class="text-gray-400 text-sm mt-1">성명을 입력하여 시작하십시오</p>
                         </div>
                     </div>
                     <div class="space-y-4">
@@ -177,11 +199,14 @@
                 const name = input.value.trim();
                 if (!name) return showToast("이름을 입력해주세요.");
                 btn.disabled = true;
-                btn.innerText = "조회 중...";
-
-                if (STATE.isConnected) {
-                    const snap = await getDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'users', name));
-                    STATE.user = snap.exists() ? snap.data() : { name, status: 'none', score: 0, attempts: 0, lastDate: '-' };
+                if (STATE.isConnected && STATE.currentUser) {
+                    try {
+                        const snap = await getDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'user_results', name));
+                        STATE.user = snap.exists() ? snap.data() : { name, status: 'none', score: 0, attempts: 0, lastDate: '-' };
+                    } catch (e) {
+                        console.error("User login fetch error:", e);
+                        STATE.user = { name, status: 'none', score: 0, attempts: 0, lastDate: '-' };
+                    }
                 } else {
                     STATE.user = { name, status: 'none', score: 0, attempts: 0, lastDate: '-' };
                 }
@@ -199,7 +224,7 @@
                     <div class="glass-card p-8 flex justify-between items-center border-l-8 ${isPassed ? 'border-green-500' : 'border-blue-500'}">
                         <div>
                             <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Candidate</p>
-                            <h3 class="text-3xl font-black text-gray-800">${STATE.user.name}</h3>
+                            <h3 class="text-3xl font-black">${STATE.user.name}</h3>
                         </div>
                         <div class="text-right">
                             <span class="px-3 py-1 rounded-full text-[10px] font-bold ${isPassed ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}">
@@ -207,27 +232,25 @@
                             </span>
                         </div>
                     </div>
-
                     ${isPassed ? `
                         <div class="glass-card p-10 flex flex-col items-center space-y-6">
                             <div class="text-center">
-                                <h4 class="font-bold text-gray-800">모바일 안전 이수증</h4>
+                                <h4 class="font-bold">모바일 안전 이수증</h4>
                                 <p class="text-[11px] text-gray-400 mt-1">현장 출입 시 보안 요원에게 제시</p>
                             </div>
                             <div id="qrcode" class="p-4 bg-white border-[10px] border-gray-50 rounded-[2rem]"></div>
                             <div class="text-center">
                                 <p class="text-xs font-black text-blue-600 tracking-widest">${STATE.user.lastDate}</p>
-                                <p class="text-[9px] text-gray-300 mt-1 uppercase">Authenticated by S-Safety System</p>
+                                <p class="text-[9px] text-gray-300 mt-1 uppercase tracking-tight">Authenticated by S-Safety System</p>
                             </div>
                         </div>
                     ` : `
                         <div class="space-y-4">
                             <div class="bg-blue-50/50 p-6 rounded-[2rem] border border-blue-100">
                                 <h4 class="font-bold text-blue-800 text-sm flex items-center"><i class="fas fa-info-circle mr-2"></i>시험 유의사항</h4>
-                                <ul class="text-[11px] text-blue-700/70 mt-3 space-y-2 leading-relaxed">
-                                    <li>• 총 10문항 중 8문항(80점) 이상 합격입니다.</li>
-                                    <li>• 불합격 시 합격할 때까지 재응시가 가능합니다.</li>
-                                    <li>• 본 교육은 당일 유효합니다.</li>
+                                <ul class="text-[11px] text-blue-700/70 mt-3 space-y-2">
+                                    <li>• 총 10문항 중 8문항(80점) 이상 합격</li>
+                                    <li>• 불합격 시 무제한 재응시 가능</li>
                                 </ul>
                             </div>
                             <button id="startQuiz" class="w-full py-6 rounded-[2rem] btn-primary font-bold text-lg shadow-xl">평가 시작 (10문항)</button>
@@ -259,23 +282,22 @@
             const prog = ((STATE.currentIndex + 1) / 10) * 100;
             el.innerHTML = `
                 <div class="flex-grow flex flex-col animate-in">
-                    <div class="mb-10">
-                        <div class="flex justify-between items-center mb-3 text-[10px] font-bold text-gray-400 tracking-tighter">
-                            <span>QUESTION ${STATE.currentIndex + 1} OF 10</span>
-                            <span class="text-blue-600">${Math.round(prog)}%</span>
+                    <div class="mb-8">
+                        <div class="flex justify-between items-center mb-2 text-[10px] font-bold text-gray-400 uppercase">
+                            <span>Question ${STATE.currentIndex + 1} / 10</span>
+                            <span>${Math.round(prog)}%</span>
                         </div>
                         <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                             <div class="h-full samsung-blue transition-all duration-500" style="width: ${prog}%"></div>
                         </div>
                     </div>
-                    
-                    <div class="flex-grow space-y-10">
-                        <h3 class="text-xl font-bold text-gray-800 leading-tight">${q.q}</h3>
+                    <div class="flex-grow space-y-8">
+                        <h3 class="text-xl font-bold leading-tight">${q.q}</h3>
                         <div class="space-y-3">
                             ${q.a.map((txt, i) => `
-                                <div onclick="window.ans(${i})" class="quiz-option p-6 flex items-center space-x-4">
-                                    <div class="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center text-[10px] font-bold text-gray-400">${i+1}</div>
-                                    <span class="font-medium text-gray-700 text-sm">${txt}</span>
+                                <div onclick="window.submitAns(${i})" class="quiz-option p-5 flex items-center space-x-4">
+                                    <div class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold">${i+1}</div>
+                                    <span class="font-medium text-sm">${txt}</span>
                                 </div>
                             `).join('')}
                         </div>
@@ -284,64 +306,57 @@
             `;
         }
 
-        window.ans = async (idx) => {
+        window.submitAns = async (idx) => {
             STATE.answers.push(idx);
             if (STATE.currentIndex < 9) {
                 STATE.currentIndex++;
                 render();
             } else {
-                await finish();
+                let correct = 0;
+                STATE.currentQuiz.forEach((q, i) => { if (q.c === STATE.answers[i]) correct++; });
+                const score = correct * 10;
+                STATE.user.attempts++;
+                STATE.user.score = Math.max(STATE.user.score, score);
+                STATE.user.lastDate = new Date().toLocaleDateString('ko-KR');
+                if (score >= 80) STATE.user.status = 'passed';
+                else if (STATE.user.status !== 'passed') STATE.user.status = 'failed';
+                
+                if (STATE.isConnected && STATE.currentUser) {
+                    try {
+                        await setDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'user_results', STATE.user.name), STATE.user);
+                    } catch (e) {
+                        console.error("Score save error:", e);
+                    }
+                }
+                STATE.view = 'result';
+                render();
             }
         };
-
-        async function finish() {
-            let correct = 0;
-            STATE.currentQuiz.forEach((q, i) => { if (q.c === STATE.answers[i]) correct++; });
-            const score = correct * 10;
-            const pass = score >= 80;
-
-            STATE.user.attempts++;
-            STATE.user.score = Math.max(STATE.user.score, score);
-            STATE.user.lastDate = new Date().toLocaleDateString('ko-KR');
-            if (pass) STATE.user.status = 'passed';
-            else if (STATE.user.status !== 'passed') STATE.user.status = 'failed';
-
-            if (STATE.isConnected) {
-                await setDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'users', STATE.user.name), STATE.user);
-            }
-            STATE.view = 'result';
-            render();
-        }
 
         function renderResult(el) {
             const pass = STATE.user.score >= 80;
             el.innerHTML = `
                 <div class="flex-grow flex flex-col items-center justify-center space-y-8 animate-in text-center">
-                    <div class="w-24 h-24 rounded-full flex items-center justify-center ${pass ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
-                        <i class="fas ${pass ? 'fa-check-circle' : 'fa-times-circle'} text-6xl"></i>
-                    </div>
+                    <i class="fas ${pass ? 'fa-check-circle text-green-500' : 'fa-times-circle text-red-500'} text-7xl"></i>
                     <div>
-                        <h2 class="text-6xl font-black text-gray-800">${STATE.user.score}<span class="text-xl font-bold ml-1 text-gray-300">점</span></h2>
-                        <p class="text-lg font-bold mt-2 ${pass ? 'text-green-600' : 'text-red-600'}">${pass ? '교육 합격!' : '교육 불합격'}</p>
-                    </div>
-                    <div class="w-full glass-card p-6 space-y-4 text-left">
-                        <div class="flex justify-between text-xs font-bold"><span class="text-gray-400">결과</span><span class="${pass?'text-green-600':'text-red-600'}">${pass?'합격 (이수증 발급)':'재응시 권고'}</span></div>
-                        <div class="flex justify-between text-xs font-bold"><span class="text-gray-400">정답 개수</span><span>${STATE.user.score/10}/10개</span></div>
+                        <h2 class="text-6xl font-black">${STATE.user.score}</h2>
+                        <p class="text-lg font-bold mt-2 ${pass ? 'text-green-600' : 'text-red-600'}">${pass ? '합격입니다!' : '불합격입니다'}</p>
                     </div>
                     <button onclick="STATE.view='dashboard';render();" class="w-full py-6 rounded-[2rem] btn-primary font-bold shadow-xl">메인으로 돌아가기</button>
                 </div>
             `;
         }
 
-        // --- Admin Dashboard Logic ---
-
         async function renderAdmin(el) {
-            if (STATE.isConnected) {
-                const snap = await getDocs(collection(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'users'));
-                STATE.adminData = snap.docs.map(d => d.data());
+            if (STATE.isConnected && STATE.currentUser) {
+                try {
+                    const snap = await getDocs(collection(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'user_results'));
+                    STATE.adminData = snap.docs.map(d => d.data());
+                } catch (e) {
+                    console.error("Admin data fetch error:", e);
+                }
             }
 
-            // Statistics Logic
             const now = new Date();
             const currentMonth = `${now.getFullYear()}. ${now.getMonth() + 1}.`;
             const monthlyData = STATE.adminData.filter(u => u.lastDate && u.lastDate.includes(currentMonth));
@@ -351,44 +366,36 @@
             el.innerHTML = `
                 <div class="space-y-6 animate-in pb-10">
                     <div class="flex justify-between items-center">
-                        <h2 class="text-xl font-bold">Admin Dashboard</h2>
-                        <button onclick="location.reload()" class="text-[10px] font-black text-gray-300 bg-gray-50 px-3 py-1 rounded-full">SIGN OUT</button>
+                        <h2 class="text-xl font-bold">관리자 패널</h2>
+                        <button onclick="STATE.view='login';render();" class="text-[10px] font-black text-gray-400 bg-gray-100 px-3 py-1 rounded-full uppercase">로그아웃</button>
                     </div>
-
-                    <!-- Statistics Cards -->
                     <div class="grid grid-cols-2 gap-3">
                         <div class="glass-card p-5">
-                            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Monthly Attempts</p>
+                            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">월간 응시</p>
                             <p class="text-3xl font-black text-blue-600">${totalAttempts}</p>
                         </div>
                         <div class="glass-card p-5">
-                            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Monthly Passed</p>
+                            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">월간 이수</p>
                             <p class="text-3xl font-black text-green-500">${totalPassed}</p>
                         </div>
                     </div>
-
-                    <!-- Management Actions -->
                     <div class="glass-card p-6 space-y-4">
-                        <h4 class="text-xs font-bold text-gray-800 flex items-center"><i class="fas fa-tools mr-2"></i>데이터 및 문제 관리</h4>
+                        <h4 class="text-xs font-bold flex items-center"><i class="fas fa-tools mr-2 text-blue-600"></i>시스템 관리</h4>
                         <div class="grid grid-cols-2 gap-3">
-                            <button id="excelUploadBtn" class="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200 hover:bg-gray-100 transition-all">
+                            <button id="excelUploadBtn" class="flex flex-col items-center p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200 hover:bg-gray-100">
                                 <i class="fas fa-file-upload text-blue-500 mb-2"></i>
                                 <span class="text-[10px] font-bold">문제 은행 업로드</span>
                             </button>
-                            <button id="excelDownloadBtn" class="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200 hover:bg-gray-100 transition-all">
+                            <button id="excelDownloadBtn" class="flex flex-col items-center p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200 hover:bg-gray-100">
                                 <i class="fas fa-file-download text-green-500 mb-2"></i>
                                 <span class="text-[10px] font-bold">결과 RAW 다운로드</span>
                             </button>
                         </div>
                         <input type="file" id="excelFileInput" class="hidden" accept=".xlsx">
-                        <p class="text-[9px] text-gray-400 text-center">* 엑셀 형식: [문제, 보기1, 보기2, 보기3, 보기4, 정답(0-3)]</p>
                     </div>
-
-                    <!-- User Table -->
                     <div class="glass-card overflow-hidden">
                         <div class="p-4 border-b bg-gray-50/50 flex justify-between items-center">
-                            <span class="text-[10px] font-bold text-gray-500 uppercase">Recent Candidates</span>
-                            <span class="text-[10px] font-bold text-blue-600">Total: ${STATE.adminData.length}</span>
+                            <span class="text-[10px] font-bold text-gray-500 uppercase">전체 사용자 (${STATE.adminData.length})</span>
                         </div>
                         <div class="max-h-[300px] overflow-y-auto">
                             <table class="w-full text-[11px] text-left">
@@ -398,11 +405,11 @@
                                 <tbody class="divide-y divide-gray-50">
                                     ${STATE.adminData.slice().reverse().map(u => `
                                         <tr>
-                                            <td class="p-3 font-bold text-gray-700">${u.name}</td>
+                                            <td class="p-3 font-bold">${u.name}</td>
                                             <td class="p-3 text-gray-500">${u.score}</td>
                                             <td class="p-3">
                                                 <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${u.status==='passed'?'bg-green-100 text-green-600':'bg-red-100 text-red-600'}">
-                                                    ${u.status ? u.status.toUpperCase() : 'N/A'}
+                                                    ${u.status ? u.status.toUpperCase() : '-'}
                                                 </span>
                                             </td>
                                         </tr>
@@ -414,13 +421,12 @@
                 </div>
             `;
 
-            // Admin Event Listeners
             document.getElementById('excelDownloadBtn').onclick = () => {
                 const ws = XLSX.utils.json_to_sheet(STATE.adminData);
                 const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "RawData");
-                XLSX.writeFile(wb, `S-Safety_Results_${new Date().toISOString().split('T')[0]}.xlsx`);
-                showToast("결과 보고서를 다운로드합니다.");
+                XLSX.utils.book_append_sheet(wb, ws, "SafetyData");
+                XLSX.writeFile(wb, `S_Safety_Data_${new Date().toISOString().split('T')[0]}.xlsx`);
+                showToast("결과 데이터를 다운로드합니다.");
             };
 
             document.getElementById('excelUploadBtn').onclick = () => document.getElementById('excelFileInput').click();
@@ -428,58 +434,61 @@
                 const file = e.target.files[0];
                 const reader = new FileReader();
                 reader.onload = async (evt) => {
-                    const data = evt.target.result;
-                    const workbook = XLSX.read(data, {type: 'binary'});
-                    const firstSheet = workbook.SheetNames[0];
-                    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
-                    
-                    const newQuestions = rows.map(r => ({
-                        q: r['문제'],
-                        a: [r['보기1'], r['보기2'], r['보기3'], r['보기4']],
-                        c: parseInt(r['정답'])
-                    })).filter(q => q.q && q.a[0]);
+                    try {
+                        const data = evt.target.result;
+                        const workbook = XLSX.read(data, {type: 'binary'});
+                        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                        const newQ = rows.map(r => ({
+                            q: r['문제'],
+                            a: [r['보기1'], r['보기2'], r['보기3'], r['보기4']],
+                            c: parseInt(r['정답'])
+                        })).filter(q => q.q && q.a[0]);
 
-                    if (newQuestions.length >= 5) {
-                        STATE.questions = newQuestions;
-                        if (STATE.isConnected) {
-                            await setDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'config', 'questions'), {list: newQuestions});
-                        }
-                        showToast(`${newQuestions.length}문항이 성공적으로 업로드되었습니다.`);
-                        renderAdmin(el);
-                    } else {
-                        showToast("엑셀 형식 오류 또는 문항 수 부족(최소 5문항)");
-                    }
+                        if (newQ.length >= 5) {
+                            STATE.questions = newQ;
+                            if (STATE.isConnected && STATE.currentUser) {
+                                // FIXED PATH HERE AS WELL
+                                const qRef = doc(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'settings', 'questions');
+                                await setDoc(qRef, { list: JSON.stringify(newQ) });
+                            }
+                            showToast(`${newQ.length}문항 업로드 완료`);
+                            renderAdmin(el);
+                        } else { showToast("문항 형식이 올바르지 않습니다."); }
+                    } catch(e) { showToast("파일 읽기 오류"); }
                 };
                 reader.readAsBinaryString(file);
             };
         }
 
-        // --- Modals & Global UI ---
-
-        const adminModal = document.getElementById('adminModal');
-        const adminPinInput = document.getElementById('adminPin');
-
-        document.getElementById('adminBtn').onclick = () => {
-            adminModal.classList.remove('hidden');
-            adminPinInput.focus();
+        window.openAdminModal = () => {
+            document.getElementById('adminModal').classList.remove('hidden');
+            document.getElementById('adminPin').focus();
         };
 
-        document.getElementById('closeAdmin').onclick = () => {
-            adminModal.classList.add('hidden');
-            adminPinInput.value = '';
+        window.closeAdminModal = () => {
+            document.getElementById('adminModal').classList.add('hidden');
+            document.getElementById('adminPin').value = '';
         };
 
         document.getElementById('authAdmin').onclick = () => {
-            if (adminPinInput.value === '1234') {
+            const pin = document.getElementById('adminPin').value;
+            if (pin === '1234') {
                 STATE.view = 'admin';
-                adminModal.classList.add('hidden');
-                adminPinInput.value = '';
+                window.closeAdminModal();
                 render();
             } else {
-                showToast("PIN 번호가 일치하지 않습니다.");
-                adminPinInput.value = '';
+                showToast("비밀번호가 틀렸습니다.");
+                document.getElementById('adminPin').value = '';
             }
         };
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            if (!t) return;
+            t.innerText = msg;
+            t.style.opacity = '1';
+            setTimeout(() => t.style.opacity = '0', 3000);
+        }
 
         window.onload = init;
     </script>
