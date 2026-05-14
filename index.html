@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -17,7 +18,7 @@
         .quiz-option { border: 2px solid #e5e7eb; transition: all 0.2s; cursor: pointer; }
         .quiz-option.selected { border-color: var(--samsung-blue); background-color: #f0f7ff; }
         .glass-card { background: rgba(255, 255, 255, 0.95); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); border-radius: 20px; }
-       
+        
         @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
         .animate-slide { animation: slideIn 0.3s ease-out; }
         #qrcode img { margin: 0 auto; border: 4px solid white; padding: 10px; border-radius: 12px; background: white; }
@@ -26,7 +27,7 @@
 <body class="min-h-screen flex flex-col">
 
     <div id="app" class="max-w-md mx-auto w-full min-h-screen bg-white shadow-2xl flex flex-col relative overflow-hidden">
-       
+        
         <!-- Header -->
         <header class="samsung-blue text-white p-5 sticky top-0 z-50 flex justify-between items-center shadow-md">
             <div class="flex items-center space-x-2">
@@ -112,7 +113,7 @@
                         <p class="text-gray-500 text-sm">성명을 입력하여 인증을 진행해 주세요.</p>
                     </div>
                     <div class="space-y-4">
-                        <input type="text" id="nameInput" placeholder="성명 입력"
+                        <input type="text" id="nameInput" placeholder="성명 입력" 
                             class="w-full px-5 py-4 rounded-xl border-2 border-gray-100 focus:border-blue-600 outline-none transition-all text-lg font-medium">
                         <button id="loginBtn" class="w-full py-4 rounded-xl text-white font-bold btn-primary shadow-lg text-lg">
                             인증 및 시작하기
@@ -242,17 +243,17 @@
                     <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                         <div class="samsung-blue h-full transition-all duration-300" style="width: ${progress}%"></div>
                     </div>
-                   
+                    
                     <div class="flex justify-between items-center text-xs font-bold text-gray-400">
                         <span>QUESTION ${state.currentIndex + 1} / 10</span>
                     </div>
 
                     <div class="flex-grow space-y-8">
                         <h3 class="text-xl font-bold text-gray-800 leading-snug">${q.q}</h3>
-                       
+                        
                         <div class="space-y-3">
                             ${q.a.map((opt, i) => `
-                                <div onclick="selectAnswer(${i})"
+                                <div onclick="selectAnswer(${i})" 
                                      class="quiz-option p-4 rounded-2xl flex items-center space-x-3 ${state.answers[state.currentIndex] === i ? 'selected' : ''}">
                                     <span class="w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold text-sm ${state.answers[state.currentIndex] === i ? 'bg-blue-600 border-blue-600 text-white' : 'text-gray-400 border-gray-200'}">
                                         ${i + 1}
@@ -302,7 +303,7 @@
 
             const isPassed = score >= 80;
             const updatedAttempts = (state.user.attempts || 0) + 1;
-           
+            
             const finalData = {
                 ...state.user,
                 score: isPassed ? score : (state.user.score || 0), // 합격일 때만 점수 갱신
@@ -324,7 +325,7 @@
 
         function renderResult() {
             const isPassed = state.user.status === 'passed';
-           
+            
             content.innerHTML = `
                 <div class="animate-slide space-y-6 text-center h-full flex flex-col justify-center">
                     <div class="glass-card p-8 border-t-4 ${isPassed ? 'border-green-500' : 'border-red-500'}">
@@ -359,7 +360,7 @@
                             ` : '<p class="text-red-500 font-bold">재교육 가능 횟수 초과</p>'}
                         `}
                     </div>
-                   
+                    
                     <button onclick="location.reload()" class="text-gray-400 text-sm font-medium hover:text-blue-600 transition-colors">
                         <i class="fas fa-home mr-1"></i> 메인 화면으로 이동
                     </button>
@@ -420,7 +421,7 @@
                 const snap = await getDocs(resRef);
                 let list = [];
                 snap.forEach(d => list.push(d.data()));
-               
+                
                 if(list.length === 0) {
                     table.innerHTML = '<p class="text-center py-4 text-gray-400">응시 기록이 없습니다.</p>';
                     return;
