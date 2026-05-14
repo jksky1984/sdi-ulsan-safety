@@ -2,68 +2,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S-Safety Admin | 삼성SDI 안전교육 시스템</title>
+    <title>S-Safety System | 삼성SDI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/easyqrcodejs@4.4.10/dist/easy.qrcode.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
-        :root { --samsung-blue: #0047BA; --samsung-dark: #002D72; }
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
+        :root { --samsung-blue: #0047BA; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f1f5f9; }
         .samsung-blue { background-color: var(--samsung-blue); }
-        .samsung-blue-text { color: var(--samsung-blue); }
-        .btn-primary { background-color: var(--samsung-blue); color: white; border: none; transition: 0.2s; }
-        .btn-primary:disabled { background-color: #94a3b8; cursor: not-allowed; }
-        .glass-card { background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; }
-        .quiz-option { border: 2px solid #f1f5f9; cursor: pointer; transition: 0.2s; border-radius: 12px; }
-        .quiz-option:hover { background-color: #eff6ff; }
-        .quiz-option.selected { border-color: var(--samsung-blue); background-color: #eff6ff; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-up { animation: slideUp 0.4s ease-out forwards; }
+        .btn-primary { background-color: var(--samsung-blue); color: white; transition: all 0.2s; }
+        .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
+        .glass-card { background: white; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+        .quiz-option { border: 2px solid #f1f5f9; border-radius: 16px; cursor: pointer; transition: 0.2s; }
+        .quiz-option:hover { background-color: #f8fafc; border-color: #cbd5e1; }
+        .quiz-option.active { border-color: var(--samsung-blue); background-color: #eff6ff; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.4s ease-out forwards; }
     </style>
 </head>
-<body class="min-h-screen">
-    <div id="app" class="max-w-xl mx-auto min-h-screen bg-white shadow-2xl flex flex-col relative">
-        <!-- Header -->
-        <header class="samsung-blue text-white p-5 flex justify-between items-center sticky top-0 z-50">
-            <div class="flex items-center space-x-2 cursor-pointer" onclick="location.reload()">
-                <i class="fas fa-shield-alt"></i>
-                <h1 class="font-bold text-lg tracking-tighter">S-SAFETY <span class="font-light opacity-70 ml-1">ADMIN</span></h1>
+<body class="min-h-screen flex items-center justify-center p-0 sm:p-4">
+    <div id="app" class="w-full max-w-md bg-white min-h-screen sm:min-h-[850px] sm:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col relative border-[8px] border-white">
+        
+        <!-- Top Navigation -->
+        <nav class="samsung-blue p-6 text-white flex justify-between items-center shrink-0">
+            <div class="flex items-center space-x-2" onclick="location.reload()">
+                <i class="fas fa-shield-virus text-xl"></i>
+                <span class="font-bold tracking-tight text-lg">S-SAFETY</span>
             </div>
             <div class="flex items-center space-x-3">
-                <div id="sync-status" class="flex items-center space-x-1 bg-black/20 px-2 py-1 rounded-full">
-                    <div class="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                    <span class="text-[10px]">OFFLINE</span>
+                <div id="net-indicator" class="flex items-center space-x-1.5 bg-white/10 px-3 py-1 rounded-full border border-white/20">
+                    <div class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></div>
+                    <span class="text-[10px] font-bold">CONNECTING</span>
                 </div>
-                <button id="adminBtn" class="text-white/60 hover:text-white"><i class="fas fa-cog"></i></button>
+                <button id="adminBtn" class="opacity-50 hover:opacity-100 transition-opacity"><i class="fas fa-cog"></i></button>
             </div>
-        </header>
+        </nav>
 
-        <!-- Main Content -->
-        <main id="main-content" class="flex-grow p-6 overflow-y-auto">
-            <!-- Dynamic Content Load -->
-            <div class="flex flex-col items-center justify-center h-full py-20">
-                <i class="fas fa-circle-notch animate-spin text-blue-600 text-3xl"></i>
+        <!-- Main Content Area -->
+        <main id="view-container" class="flex-grow flex flex-col p-6 overflow-y-auto">
+            <!-- Loading Spinner (Default) -->
+            <div class="flex-grow flex flex-col items-center justify-center space-y-4">
+                <div class="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+                <p class="text-sm text-gray-400 font-medium">데이터 동기화 중...</p>
             </div>
         </main>
 
-        <footer class="p-4 bg-gray-50 text-center border-t border-gray-100">
-            <p class="text-[10px] text-gray-400 font-bold tracking-widest uppercase">Samsung SDI Ulsan Plant • Safety First</p>
-        </footer>
+        <!-- Global Alert Toast -->
+        <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 px-6 py-3 bg-gray-900 text-white text-xs rounded-full shadow-2xl opacity-0 transition-opacity pointer-events-none z-[200]">
+            메시지 내용
+        </div>
     </div>
 
-    <!-- Admin Password Modal -->
-    <div id="adminModal" class="fixed inset-0 bg-black/70 z-[100] hidden items-center justify-center p-6">
-        <div class="bg-white rounded-3xl w-full max-w-sm p-8 space-y-6 animate-up">
-            <div class="text-center">
-                <h3 class="text-xl font-bold">관리자 인증</h3>
-                <p class="text-sm text-gray-500 mt-1">시스템 설정을 위해 암호를 입력하세요.</p>
-            </div>
-            <input type="password" id="adminPassInput" class="w-full p-4 bg-gray-100 rounded-2xl text-center text-2xl tracking-widest outline-none border-2 border-transparent focus:border-blue-600" placeholder="••••">
-            <div class="flex space-x-3">
-                <button id="adminClose" class="flex-1 py-4 text-gray-400 font-bold">취소</button>
-                <button id="adminConfirm" class="flex-1 py-4 samsung-blue text-white rounded-2xl font-bold">확인</button>
+    <!-- Admin Auth Modal -->
+    <div id="adminModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] hidden items-center justify-center p-6">
+        <div class="bg-white w-full max-w-xs rounded-[2rem] p-8 animate-in shadow-2xl text-center space-y-6">
+            <h3 class="text-xl font-bold">관리자 인증</h3>
+            <input type="password" id="adminPassword" placeholder="PIN" class="w-full p-4 bg-gray-100 rounded-2xl text-center text-2xl tracking-[1em] outline-none border-2 border-transparent focus:border-blue-600">
+            <div class="flex space-x-2">
+                <button id="closeAdmin" class="flex-1 py-4 text-gray-400 font-bold">닫기</button>
+                <button id="authAdmin" class="flex-1 py-4 samsung-blue text-white rounded-2xl font-bold">확인</button>
             </div>
         </div>
     </div>
@@ -73,227 +72,241 @@
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // APP CONFIG & STATE
+        // --- App Configuration & State ---
+        const DEFAULT_QUESTIONS = [
+            { q: "작업 전 안전점검회의(TBM)의 주요 목적이 아닌 것은?", a: ["위험요소 발굴", "작업 내용 공유", "개인별 성과 측정", "안전 보호구 점검"], c: 2 },
+            { q: "화재 발생 시 가장 먼저 취해야 할 행동은?", a: ["귀중품 챙기기", "주변에 알리고 대피", "엘리베이터 탑승", "혼자서 불 끄기"], c: 1 },
+            { q: "전기 작업 시 절연 장갑을 착용해야 하는 이유는?", a: ["청결 유지", "감전 사고 예방", "그립감 향상", "추위 방지"], c: 1 },
+            { q: "안전모의 올바른 착용법으로 틀린 것은?", a: ["턱끈을 조인다", "머리 크기에 맞춘다", "뒤집어서 써도 된다", "균열 여부를 확인한다"], c: 2 },
+            { q: "화학물질 취급 시 반드시 확인해야 하는 서류는?", a: ["근로계약서", "MSDS(물질안전보건자료)", "작업일보", "재무제표"], c: 1 },
+            { q: "고소 작업의 기준 높이는 보통 몇 미터 이상인가?", a: ["1m", "2m", "5m", "10m"], c: 1 },
+            { q: "밀폐공간 작업 전 가장 먼저 수행해야 하는 것은?", a: ["조명 설치", "산소 농도 측정", "도구 반입", "청소"], c: 1 },
+            { q: "중량물 운반 시 올바른 자세는?", a: ["허리만 굽힌다", "무릎을 굽히고 몸 가까이 밀착", "반동을 이용한다", "한손으로 든다"], c: 1 },
+            { q: "사고 발생 시 보고 절차로 맞는 것은?", a: ["퇴근 후 보고", "즉시 상급자 보고", "모르는 척 한다", "일주일 내 보고"], c: 1 },
+            { q: "보행 중 스마트폰 사용이 위험한 이유는?", a: ["배터리 소모", "시야 협착 및 반응 저하", "데이터 요금 발생", "기기 파손"], c: 1 }
+        ];
+
         const STATE = {
             view: 'login', // login, dashboard, quiz, result, admin
             user: null,
-            appId: typeof __app_id !== 'undefined' ? __app_id : 'sdi-safety-v2',
+            questions: [...DEFAULT_QUESTIONS],
             db: null,
+            appId: typeof __app_id !== 'undefined' ? __app_id : 'samsung-sdi-safety',
             isConnected: false,
-            // 기본 문제 (엑셀 업로드 전 대체제)
-            questions: Array(20).fill().map((_, i) => ({
-                q: `[샘플] 안전 수칙 문제 ${i+1}번 항목에 대한 설명으로 옳은 것은?`,
-                a: ["매우 그렇다", "그렇다", "보통이다", "아니다"],
-                c: 0
-            })),
             currentQuiz: [],
             currentIndex: 0,
             answers: [],
-            allUsers: []
+            adminData: []
         };
 
-        // Initialize Firebase
-        async function initApp() {
+        // --- Core Functions ---
+
+        async function init() {
+            // 네트워크 타임아웃 설정 (3초)
+            const timeout = new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000));
+            
             try {
-                if (typeof __firebase_config !== 'undefined') {
-                    const config = JSON.parse(__firebase_config);
-                    const app = initializeApp(config);
-                    STATE.db = getFirestore(app);
-                    const auth = getAuth(app);
-                    await signInAnonymously(auth);
-                    STATE.isConnected = true;
-                    document.getElementById('sync-status').innerHTML = `<div class="w-1.5 h-1.5 rounded-full bg-green-400"></div><span class="text-[10px]">ONLINE</span>`;
-                    
-                    // 로드 시 문제 은행 동기화
-                    const qSnap = await getDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'config', 'questions'));
-                    if (qSnap.exists()) STATE.questions = qSnap.data().list;
-                }
-            } catch (e) {
-                console.warn("Offline mode active");
+                const config = JSON.parse(__firebase_config);
+                const app = initializeApp(config);
+                const auth = getAuth(app);
+                STATE.db = getFirestore(app);
+
+                await Promise.race([signInAnonymously(auth), timeout]);
+                
+                // 클라우드 설정값(문제은행) 로드
+                const qSnap = await getDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'config', 'questions'));
+                if (qSnap.exists()) STATE.questions = qSnap.data().list;
+
+                STATE.isConnected = true;
+                updateNetIndicator('ONLINE', 'bg-green-400');
+            } catch (err) {
+                console.warn("Using offline/default mode:", err);
+                updateNetIndicator('OFFLINE', 'bg-red-400');
+                showToast("네트워크 지연: 기본 모드로 시작합니다.");
             }
             render();
         }
 
-        // --- RENDERERS ---
+        function updateNetIndicator(text, colorClass) {
+            const el = document.getElementById('net-indicator');
+            el.innerHTML = `<div class="w-2 h-2 rounded-full ${colorClass}"></div><span class="text-[10px] font-bold">${text}</span>`;
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.opacity = '1';
+            setTimeout(() => t.style.opacity = '0', 3000);
+        }
+
+        // --- View Renderers ---
 
         function render() {
-            const main = document.getElementById('main-content');
-            main.className = "flex-grow p-6 overflow-y-auto";
-            
-            if (STATE.view === 'login') {
-                main.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-full space-y-10 animate-up">
-                        <div class="text-center space-y-4">
-                            <div class="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mx-auto">
-                                <i class="fas fa-user-check text-4xl samsung-blue-text"></i>
-                            </div>
+            const container = document.getElementById('view-container');
+            container.innerHTML = ''; // Clear
+
+            switch (STATE.view) {
+                case 'login':
+                    renderLogin(container);
+                    break;
+                case 'dashboard':
+                    renderDashboard(container);
+                    break;
+                case 'quiz':
+                    renderQuiz(container);
+                    break;
+                case 'result':
+                    renderResult(container);
+                    break;
+                case 'admin':
+                    renderAdmin(container);
+                    break;
+            }
+        }
+
+        function renderLogin(el) {
+            el.innerHTML = `
+                <div class="flex-grow flex flex-col justify-center space-y-12 animate-in">
+                    <div class="text-center space-y-4">
+                        <div class="w-24 h-24 bg-blue-50 rounded-[2rem] flex items-center justify-center mx-auto text-blue-600 shadow-inner">
+                            <i class="fas fa-user-shield text-4xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">삼성SDI 안전교육</h2>
+                            <p class="text-gray-400 text-sm">성명을 입력하여 본인 인증을 해주세요</p>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <input type="text" id="userName" placeholder="성명 입력" class="w-full p-6 bg-gray-50 rounded-3xl border-2 border-transparent focus:border-blue-600 focus:bg-white outline-none text-xl font-bold text-center transition-all">
+                        <button id="loginBtn" class="w-full py-6 rounded-3xl btn-primary font-bold text-lg shadow-xl shadow-blue-200">교육 시작하기</button>
+                    </div>
+                </div>
+            `;
+            const input = document.getElementById('userName');
+            const btn = document.getElementById('loginBtn');
+            const doLogin = async () => {
+                const name = input.value.trim();
+                if (!name) return showToast("이름을 입력하세요.");
+                btn.disabled = true;
+                btn.innerText = "조회 중...";
+
+                if (STATE.isConnected) {
+                    const snap = await getDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'users', name));
+                    if (snap.exists()) {
+                        STATE.user = snap.data();
+                    } else {
+                        STATE.user = { name, status: 'none', score: 0, attempts: 0, lastDate: '-' };
+                    }
+                } else {
+                    STATE.user = { name, status: 'none', score: 0, attempts: 0, lastDate: '-' };
+                }
+                STATE.view = 'dashboard';
+                render();
+            };
+            btn.onclick = doLogin;
+            input.onkeyup = (e) => e.key === 'Enter' && doLogin();
+        }
+
+        function renderDashboard(el) {
+            const isPassed = STATE.user.status === 'passed';
+            el.innerHTML = `
+                <div class="space-y-6 animate-in">
+                    <div class="glass-card p-8 border-t-[6px] ${isPassed ? 'border-green-500' : 'border-blue-500'}">
+                        <div class="flex justify-between items-start">
                             <div>
-                                <h2 class="text-2xl font-bold text-gray-800">삼성SDI 안전교육</h2>
-                                <p class="text-gray-400 text-sm">성명을 입력하여 교육을 시작하세요</p>
+                                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Candidate</p>
+                                <h3 class="text-3xl font-black text-gray-800">${STATE.user.name}</h3>
                             </div>
-                        </div>
-                        <div class="w-full max-w-sm space-y-4">
-                            <input type="text" id="userNameInput" placeholder="성명 입력" class="w-full p-5 rounded-2xl border-2 border-gray-100 focus:border-blue-600 outline-none text-xl font-bold text-center">
-                            <button id="startBtn" class="w-full py-5 rounded-2xl btn-primary font-bold text-lg shadow-xl">입장하기</button>
-                        </div>
-                    </div>
-                `;
-                document.getElementById('startBtn').onclick = handleLogin;
-                document.getElementById('userNameInput').onkeyup = (e) => e.key === 'Enter' && handleLogin();
-            } 
-            else if (STATE.view === 'dashboard') {
-                const passed = STATE.user.status === 'passed';
-                main.innerHTML = `
-                    <div class="space-y-6 animate-up">
-                        <div class="glass-card p-6 border-l-4 ${passed ? 'border-green-500' : 'border-blue-500'}">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-xs text-gray-400 font-bold uppercase">Candidate</p>
-                                    <h3 class="text-2xl font-bold text-gray-800">${STATE.user.name}</h3>
-                                </div>
-                                <span class="px-3 py-1 rounded-full text-[10px] font-bold ${passed ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}">
-                                    ${passed ? '이수 완료' : '교육 대상'}
-                                </span>
-                            </div>
-                            <div class="mt-4 pt-4 border-t border-gray-50 grid grid-cols-2 gap-4">
-                                <div><p class="text-[10px] text-gray-400">최근 응시 점수</p><p class="font-bold">${STATE.user.score || 0}점</p></div>
-                                <div><p class="text-[10px] text-gray-400">남은 응시 횟수</p><p class="font-bold">${3 - (STATE.user.attempts || 0)}회</p></div>
-                            </div>
-                        </div>
-
-                        ${passed ? `
-                            <div class="glass-card p-8 flex flex-col items-center space-y-6">
-                                <div class="text-center">
-                                    <h4 class="font-bold text-gray-800">안전교육 이수증 (QR)</h4>
-                                    <p class="text-xs text-gray-400">사업장 출입 시 보안 요원에게 제시하세요</p>
-                                </div>
-                                <div id="qrcode" class="p-2 bg-white border-4 border-blue-50 rounded-xl"></div>
-                                <p class="text-[10px] text-gray-300 font-mono">${STATE.user.lastDate || ''} ISSUED</p>
-                            </div>
-                        ` : `
-                            <div class="space-y-4">
-                                <div class="bg-blue-50 p-5 rounded-2xl">
-                                    <h4 class="font-bold text-blue-800 text-sm mb-1">평가 규칙</h4>
-                                    <ul class="text-xs text-blue-600 space-y-1">
-                                        <li>• 총 10문항이 무작위로 출제됩니다.</li>
-                                        <li>• 80점(8문제) 이상 획득 시 이수 처리됩니다.</li>
-                                        <li>• 불합격 시 최대 3회까지 재응시 가능합니다.</li>
-                                    </ul>
-                                </div>
-                                <button id="takeQuizBtn" class="w-full py-5 rounded-2xl btn-primary font-bold text-lg shadow-xl">평가 시작 (10문항)</button>
-                            </div>
-                        `}
-                    </div>
-                `;
-                if (passed) {
-                    setTimeout(() => new QRCode(document.getElementById("qrcode"), {
-                        text: `SDI-CERT|${STATE.user.name}|PASS|${STATE.user.lastDate}`,
-                        width: 160, height: 160, colorDark: "#0047BA"
-                    }), 100);
-                } else {
-                    document.getElementById('takeQuizBtn').onclick = startQuiz;
-                }
-            }
-            else if (STATE.view === 'quiz') {
-                const q = STATE.currentQuiz[STATE.currentIndex];
-                const progress = ((STATE.currentIndex + 1) / 10) * 100;
-                main.innerHTML = `
-                    <div class="space-y-8 animate-up h-full flex flex-col">
-                        <div class="space-y-2">
-                            <div class="flex justify-between items-end">
-                                <span class="text-xs font-bold text-blue-600 uppercase">Question ${STATE.currentIndex + 1}/10</span>
-                                <span class="text-[10px] text-gray-400">${Math.round(progress)}%</span>
-                            </div>
-                            <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full samsung-blue transition-all" style="width:${progress}%"></div>
-                            </div>
-                        </div>
-                        <div class="flex-grow space-y-6">
-                            <h3 class="text-xl font-bold text-gray-800 leading-tight">${q.q}</h3>
-                            <div class="space-y-3">
-                                ${q.a.map((txt, i) => `
-                                    <div onclick="window.selectOpt(${i})" class="quiz-option p-5 flex items-center space-x-4">
-                                        <div class="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-400">${i+1}</div>
-                                        <span class="font-medium text-gray-700">${txt}</span>
-                                    </div>
-                                `).join('')}
-                            </div>
+                            <span class="px-4 py-1.5 rounded-full text-[11px] font-bold ${isPassed ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}">
+                                ${isPassed ? '교육 이수 완료' : '미이수 (응시 대상)'}
+                            </span>
                         </div>
                     </div>
-                `;
-            }
-            else if (STATE.view === 'result') {
-                const isPassed = STATE.user.status === 'passed';
-                main.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-full space-y-6 animate-up py-10">
-                        <div class="w-24 h-24 rounded-full flex items-center justify-center ${isPassed ? 'bg-green-100 text-green-500' : 'bg-red-100 text-red-500'}">
-                            <i class="fas ${isPassed ? 'fa-check-circle' : 'fa-times-circle'} text-5xl"></i>
+
+                    ${isPassed ? `
+                        <div class="glass-card p-8 flex flex-col items-center space-y-8">
+                            <div class="text-center">
+                                <h4 class="font-bold text-gray-800">모바일 이수증</h4>
+                                <p class="text-xs text-gray-400 mt-1">본 QR코드를 출입 시 제시하세요</p>
+                            </div>
+                            <div id="qrcode" class="p-4 bg-white border-8 border-gray-50 rounded-3xl"></div>
+                            <div class="text-center">
+                                <p class="text-xs font-bold text-blue-600">${STATE.user.lastDate}</p>
+                                <p class="text-[10px] text-gray-300 mt-1 uppercase tracking-tighter">Verified by Samsung SDI Safety System</p>
+                            </div>
                         </div>
-                        <div class="text-center">
-                            <h2 class="text-4xl font-black text-gray-800">${STATE.user.score}<span class="text-xl ml-1">점</span></h2>
-                            <p class="text-lg font-bold ${isPassed ? 'text-green-600' : 'text-red-600'} mt-2">${isPassed ? '최종 합격 (수료)' : '불합격 (재응시 필요)'}</p>
+                    ` : `
+                        <div class="space-y-4">
+                            <div class="bg-blue-50/50 p-6 rounded-3xl border border-blue-100">
+                                <h4 class="font-bold text-blue-800 text-sm flex items-center"><i class="fas fa-info-circle mr-2"></i>시험 안내</h4>
+                                <ul class="text-xs text-blue-700/70 mt-3 space-y-2 font-medium">
+                                    <li>• 총 10문항 중 8문항 이상(80점) 합격</li>
+                                    <li>• 불합격 시 즉시 재응시 가능 (최대 3회)</li>
+                                    <li>• 모든 문제는 삼성SDI 현장 안전 수칙 기반입니다.</li>
+                                </ul>
+                            </div>
+                            <button id="startQuiz" class="w-full py-6 rounded-3xl btn-primary font-bold text-lg shadow-xl shadow-blue-100">평가 시작하기 (10문항)</button>
                         </div>
-                        <div class="w-full glass-card p-6 space-y-3">
-                            <div class="flex justify-between text-sm"><span class="text-gray-400">성명</span><span class="font-bold">${STATE.user.name}</span></div>
-                            <div class="flex justify-between text-sm"><span class="text-gray-400">맞춘 문항</span><span class="font-bold">${STATE.user.score / 10} / 10</span></div>
-                        </div>
-                        <button onclick="STATE.view='dashboard';render();" class="w-full py-5 rounded-2xl btn-primary font-bold shadow-xl">확인</button>
-                    </div>
-                `;
-            }
-            else if (STATE.view === 'admin') {
-                renderAdminView();
-            }
-        }
-
-        // --- LOGIC FUNCTIONS ---
-
-        async function handleLogin() {
-            const name = document.getElementById('userNameInput').value.trim();
-            if (!name) return;
-
-            const btn = document.getElementById('startBtn');
-            btn.disabled = true;
-            btn.innerText = "조회 중...";
-
-            // 1. 유저 데이터 즉시 확인
-            if (STATE.isConnected) {
-                const userRef = doc(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'users', name);
-                const snap = await getDoc(userRef);
-                if (snap.exists()) {
-                    STATE.user = snap.data();
-                } else {
-                    STATE.user = { name, attempts: 0, status: 'none', score: 0, lastDate: '' };
-                }
+                    `}
+                </div>
+            `;
+            if (isPassed) {
+                new QRCode(document.getElementById("qrcode"), {
+                    text: `SDI-V2|${STATE.user.name}|PASS|${STATE.user.lastDate}`,
+                    width: 180, height: 180, colorDark: "#0047BA"
+                });
             } else {
-                STATE.user = { name, attempts: 0, status: 'none', score: 0, lastDate: '' };
+                document.getElementById('startQuiz').onclick = () => {
+                    STATE.currentQuiz = [...STATE.questions].sort(() => 0.5 - Math.random()).slice(0, 10);
+                    STATE.currentIndex = 0;
+                    STATE.answers = [];
+                    STATE.view = 'quiz';
+                    render();
+                };
             }
-
-            // 2. 이수 완료자라면 대시보드(QR)로, 아니면 대시보드(안내)로
-            STATE.view = 'dashboard';
-            render();
         }
 
-        function startQuiz() {
-            // 10문제 랜덤 추출
-            STATE.currentQuiz = [...STATE.questions].sort(() => 0.5 - Math.random()).slice(0, 10);
-            STATE.currentIndex = 0;
-            STATE.answers = [];
-            STATE.view = 'quiz';
-            render();
+        function renderQuiz(el) {
+            const q = STATE.currentQuiz[STATE.currentIndex];
+            const prog = ((STATE.currentIndex + 1) / 10) * 100;
+            el.innerHTML = `
+                <div class="flex-grow flex flex-col animate-in">
+                    <div class="mb-8">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-blue-600 tracking-widest">QUESTION ${STATE.currentIndex + 1}/10</span>
+                            <span class="text-xs font-bold text-gray-300">${Math.round(prog)}%</span>
+                        </div>
+                        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full samsung-blue transition-all duration-500" style="width: ${prog}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-grow space-y-8">
+                        <h3 class="text-xl font-bold text-gray-800 leading-snug">${q.q}</h3>
+                        <div class="space-y-3">
+                            ${q.a.map((txt, i) => `
+                                <div onclick="window.submitAns(${i})" class="quiz-option p-6 flex items-center space-x-4">
+                                    <div class="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-xs font-bold text-gray-400">${i+1}</div>
+                                    <span class="font-semibold text-gray-700">${txt}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
-        window.selectOpt = async (idx) => {
+        window.submitAns = async (idx) => {
             STATE.answers.push(idx);
             if (STATE.currentIndex < 9) {
                 STATE.currentIndex++;
                 render();
             } else {
-                await processResult();
+                await finishQuiz();
             }
         };
 
-        async function processResult() {
+        async function finishQuiz() {
             let correct = 0;
             STATE.currentQuiz.forEach((q, i) => {
                 if (q.c === STATE.answers[i]) correct++;
@@ -301,163 +314,136 @@
             const score = correct * 10;
             const isPassed = score >= 80;
 
-            STATE.user.attempts = (STATE.user.attempts || 0) + 1;
-            STATE.user.score = score;
-            STATE.user.lastDate = new Date().toISOString().split('T')[0];
-            
-            // 기존에 통과한 적이 있다면 통과 유지, 아니면 이번 결과에 따라 업데이트
-            if (STATE.user.status !== 'passed') {
-                STATE.user.status = isPassed ? 'passed' : (STATE.user.attempts >= 3 ? 'blocked' : 'failed');
+            STATE.user.attempts++;
+            STATE.user.score = Math.max(STATE.user.score, score);
+            if (!STATE.user.status || STATE.user.status !== 'passed') {
+                STATE.user.status = isPassed ? 'passed' : 'failed';
+                STATE.user.lastDate = new Date().toLocaleDateString('ko-KR');
             }
 
             if (STATE.isConnected) {
-                const userRef = doc(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'users', STATE.user.name);
-                await setDoc(userRef, STATE.user);
+                await setDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'users', STATE.user.name), STATE.user);
             }
-
             STATE.view = 'result';
             render();
         }
 
-        // --- ADMIN VIEW & EXCEL ---
+        function renderResult(el) {
+            const pass = STATE.user.status === 'passed';
+            el.innerHTML = `
+                <div class="flex-grow flex flex-col items-center justify-center space-y-8 animate-in">
+                    <div class="w-24 h-24 rounded-full flex items-center justify-center ${pass ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
+                        <i class="fas ${pass ? 'fa-award' : 'fa-exclamation-triangle'} text-5xl"></i>
+                    </div>
+                    <div class="text-center">
+                        <h2 class="text-5xl font-black text-gray-800">${STATE.user.score}<span class="text-xl ml-1 text-gray-400">점</span></h2>
+                        <p class="text-xl font-bold mt-2 ${pass ? 'text-green-600' : 'text-red-600'}">${pass ? '최종 합격' : '불합격 (재응시 필요)'}</p>
+                    </div>
+                    <div class="w-full glass-card p-6 space-y-4">
+                        <div class="flex justify-between text-sm"><span class="text-gray-400 font-bold">응시자</span><span class="font-bold">${STATE.user.name}</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-gray-400 font-bold">응시 횟수</span><span class="font-bold">${STATE.user.attempts}회</span></div>
+                    </div>
+                    <button onclick="STATE.view='dashboard';render();" class="w-full py-6 rounded-3xl btn-primary font-bold shadow-xl">확인</button>
+                </div>
+            `;
+        }
 
-        async function renderAdminView() {
-            const main = document.getElementById('main-content');
-            main.className = "flex-grow p-4 bg-gray-50 overflow-y-auto";
-            
-            // 데이터 로드
-            if (STATE.isConnected && STATE.allUsers.length === 0) {
-                const q = query(collection(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'users'));
-                const snap = await getDocs(q);
-                STATE.allUsers = snap.docs.map(d => d.data());
+        // --- Admin Functions ---
+
+        async function renderAdmin(el) {
+            if (STATE.isConnected && STATE.adminData.length === 0) {
+                const snap = await getDocs(query(collection(STATE.db, 'artifacts', STATE.appId, 'public', 'data', 'users')));
+                STATE.adminData = snap.docs.map(d => d.data());
             }
 
-            // 통계 계산
-            const passedCount = STATE.allUsers.filter(u => u.status === 'passed').length;
-            const totalAttempts = STATE.allUsers.length;
+            const passed = STATE.adminData.filter(u => u.status === 'passed').length;
 
-            main.innerHTML = `
-                <div class="space-y-6 animate-up">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-xl font-bold">관리자 통계 모니터</h2>
-                        <button onclick="location.reload()" class="text-xs bg-white px-3 py-1 rounded-full shadow-sm border font-bold">로그아웃</button>
+            el.innerHTML = `
+                <div class="space-y-6 animate-in pb-10">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold">Admin Console</h2>
+                        <button onclick="location.reload()" class="text-xs font-bold text-gray-400">LOGOUT</button>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="glass-card p-4">
-                            <p class="text-[10px] text-gray-400 font-bold">총 응시 인원</p>
-                            <p class="text-2xl font-black text-blue-600">${totalAttempts}명</p>
-                        </div>
-                        <div class="glass-card p-4">
-                            <p class="text-[10px] text-gray-400 font-bold">최종 수료자</p>
-                            <p class="text-2xl font-black text-green-500">${passedCount}명</p>
-                        </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="glass-card p-4"><p class="text-[10px] font-bold text-gray-400 uppercase">Total</p><p class="text-2xl font-black">${STATE.adminData.length}</p></div>
+                        <div class="glass-card p-4"><p class="text-[10px] font-bold text-gray-400 uppercase">Passed</p><p class="text-2xl font-black text-green-500">${passed}</p></div>
                     </div>
 
-                    <!-- 엑셀 액션 -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="glass-card p-4 space-y-3">
-                            <p class="text-xs font-bold"><i class="fas fa-file-import mr-1"></i> 문제 업로드 (Excel)</p>
-                            <input type="file" id="excelInput" class="hidden" accept=".xlsx, .xls">
-                            <button onclick="document.getElementById('excelInput').click()" class="w-full py-2 bg-gray-100 text-[11px] font-bold rounded-lg border border-gray-200">파일 선택</button>
-                            <p class="text-[9px] text-gray-400">컬럼: 문제, 보기1, 보기2, 보기3, 보기4, 정답(0-3)</p>
+                    <div class="glass-card p-6 space-y-4">
+                        <h4 class="text-sm font-bold border-b pb-2">기능 관리</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="upBtn" class="py-3 bg-gray-50 rounded-xl text-[11px] font-bold border hover:bg-white transition-colors">엑셀 문제 업로드</button>
+                            <button id="downBtn" class="py-3 bg-blue-50 text-blue-600 rounded-xl text-[11px] font-bold border border-blue-100">결과 RAW 다운로드</button>
                         </div>
-                        <div class="glass-card p-4 space-y-3">
-                            <p class="text-xs font-bold"><i class="fas fa-file-export mr-1"></i> 데이터 내보내기</p>
-                            <button id="downloadRaw" class="w-full py-2 bg-green-50 text-green-600 text-[11px] font-bold rounded-lg border border-green-200">RAW 엑셀 다운</button>
-                        </div>
+                        <input type="file" id="xlIn" class="hidden" accept=".xlsx">
                     </div>
 
-                    <!-- 리스트 섹션 -->
                     <div class="glass-card overflow-hidden">
-                        <div class="p-4 border-b border-gray-50 bg-gray-50/50 flex justify-between">
-                            <span class="text-xs font-bold text-gray-500">최근 응시자 내역</span>
-                        </div>
-                        <div class="max-h-60 overflow-y-auto">
-                            <table class="w-full text-xs text-left">
-                                <thead class="bg-gray-50 text-[10px] text-gray-400 uppercase">
+                        <table class="w-full text-[11px] text-left">
+                            <thead class="bg-gray-50 text-gray-400 font-bold">
+                                <tr><th class="p-3">성명</th><th class="p-3">점수</th><th class="p-3">상태</th><th class="p-3">날짜</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50">
+                                ${STATE.adminData.slice().reverse().map(u => `
                                     <tr>
-                                        <th class="p-3">성명</th>
-                                        <th class="p-3">점수</th>
-                                        <th class="p-3">상태</th>
+                                        <td class="p-3 font-bold">${u.name}</td>
+                                        <td class="p-3">${u.score}</td>
+                                        <td class="p-3"><span class="px-2 py-0.5 rounded-full ${u.status==='passed'?'bg-green-100 text-green-600':'bg-red-100 text-red-600'}">${u.status}</span></td>
+                                        <td class="p-3 text-gray-400">${u.lastDate}</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    ${STATE.allUsers.slice(-20).reverse().map(u => `
-                                        <tr class="border-b border-gray-50">
-                                            <td class="p-3 font-bold">${u.name}</td>
-                                            <td class="p-3">${u.score}점</td>
-                                            <td class="p-3"><span class="${u.status === 'passed' ? 'text-green-500' : 'text-orange-500'} font-bold">${u.status}</span></td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
+                                `).join('')}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             `;
 
-            // 이벤트 바인딩
-            document.getElementById('excelInput').onchange = handleExcelUpload;
-            document.getElementById('downloadRaw').onclick = downloadExcel;
-        }
-
-        async function handleExcelUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = async (evt) => {
-                const data = evt.target.result;
-                const workbook = XLSX.read(data, { type: 'binary' });
-                const sheetName = workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
-                const rows = XLSX.utils.sheet_to_json(sheet);
-
-                // 파싱: [문제, 보기1, 보기2, 보기3, 보기4, 정답]
-                const newQuestions = rows.map(r => ({
-                    q: r['문제'] || r['question'],
-                    a: [r['보기1'], r['보기2'], r['보기3'], r['보기4']],
-                    c: parseInt(r['정답'])
-                })).filter(q => q.q && q.a[0]);
-
-                if (newQuestions.length < 10) {
-                    alert("최소 10문제 이상 업로드해야 합니다.");
-                    return;
-                }
-
-                STATE.questions = newQuestions;
-                if (STATE.isConnected) {
-                    await setDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'config', 'questions'), { list: newQuestions });
-                }
-                alert(`${newQuestions.length}개의 문제가 업로드되었습니다.`);
+            document.getElementById('upBtn').onclick = () => document.getElementById('xlIn').click();
+            document.getElementById('xlIn').onchange = (e) => {
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    const wb = XLSX.read(evt.target.result, {type:'binary'});
+                    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                    const newList = data.map(r => ({
+                        q: r['문제'], a: [r['보기1'], r['보기2'], r['보기3'], r['보기4']], c: parseInt(r['정답'])
+                    })).filter(q => q.q && q.a[0]);
+                    
+                    if(newList.length >= 10) {
+                        STATE.questions = newList;
+                        if(STATE.isConnected) await setDoc(doc(STATE.db, 'artifacts', STATE.appId, 'public', 'config', 'questions'), {list: newList});
+                        showToast(`${newList.length}문제 업데이트 완료!`);
+                    } else {
+                        showToast("엑셀 형식이 맞지 않거나 문항이 부족합니다.");
+                    }
+                };
+                reader.readAsBinaryString(e.target.files[0]);
             };
-            reader.readAsBinaryString(file);
+
+            document.getElementById('downBtn').onclick = () => {
+                const ws = XLSX.utils.json_to_sheet(STATE.adminData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Exam_Results");
+                XLSX.writeFile(wb, `Safety_Results_${new Date().toISOString().split('T')[0]}.xlsx`);
+            };
         }
 
-        function downloadExcel() {
-            if (STATE.allUsers.length === 0) return alert("데이터가 없습니다.");
-            const worksheet = XLSX.utils.json_to_sheet(STATE.allUsers);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "SafetyData");
-            XLSX.writeFile(workbook, `SDI_Safety_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
-        }
+        // --- UI Interactions ---
 
-        // --- AUTH MODAL ---
         const modal = document.getElementById('adminModal');
         document.getElementById('adminBtn').onclick = () => modal.classList.remove('hidden');
-        document.getElementById('adminClose').onclick = () => modal.classList.add('hidden');
-        document.getElementById('adminConfirm').onclick = () => {
-            if (document.getElementById('adminPassInput').value === '1234') {
+        document.getElementById('closeAdmin').onclick = () => modal.classList.add('hidden');
+        document.getElementById('authAdmin').onclick = () => {
+            if(document.getElementById('adminPassword').value === '1234') {
                 STATE.view = 'admin';
                 modal.classList.add('hidden');
                 render();
             } else {
-                alert("비밀번호 불일치");
+                showToast("비밀번호가 틀렸습니다.");
             }
         };
 
-        window.onload = initApp;
+        window.onload = init;
     </script>
 </body>
 </html>
