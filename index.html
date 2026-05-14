@@ -18,7 +18,7 @@
         .quiz-option { border: 2px solid #e5e7eb; transition: all 0.2s; cursor: pointer; border-radius: 12px; }
         .quiz-option.selected { border-color: var(--samsung-blue); background-color: #eff6ff; }
         .glass-card { background: white; border-radius: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
-        .tab-btn { border-bottom: 3px solid transparent; color: #9ca3af; transition: all 0.3s; background: none; border: none; cursor: pointer; }
+        .tab-btn { border-bottom: 3px solid transparent; color: #9ca3af; transition: all 0.3s; background: none; border: none; cursor: pointer; font-size: 0.875rem; }
         .tab-btn.active { border-bottom: 3px solid var(--samsung-blue); color: var(--samsung-blue); font-weight: bold; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-in { animation: fadeIn 0.4s ease-out forwards; }
@@ -49,6 +49,7 @@
             <p class="text-[10px] text-gray-400 font-bold tracking-widest uppercase">Samsung SDI Ulsan Plant</p>
         </footer>
 
+        <!-- 관리자 인증 모달 -->
         <div id="adminPassModal" class="fixed inset-0 bg-black/60 z-[100] hidden items-center justify-center p-6">
             <div class="bg-white rounded-3xl w-full p-8 space-y-6 animate-in">
                 <div class="text-center">
@@ -91,7 +92,8 @@
             ],
             currentQuiz: [],
             currentIndex: 0,
-            answers: []
+            answers: [],
+            allUsersData: [] // 관리자용 전체 데이터 캐시
         };
 
         async function init() {
@@ -100,14 +102,12 @@
                 STATE.db = getFirestore(app);
                 STATE.auth = getAuth(app);
 
-                // Auth 실행 (필수)
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(STATE.auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(STATE.auth);
                 }
                 
-                // 문제 은행 로드 (실시간 반영 아님, 초기 1회 로드)
                 const qRef = doc(STATE.db, 'artifacts', appId, 'public', 'data', 'config', 'questionBank');
                 const qSnap = await getDoc(qRef);
                 if(qSnap.exists() && qSnap.data().list) STATE.questions = qSnap.data().list;
@@ -115,7 +115,7 @@
                 render();
             } catch (e) {
                 console.error("Initialization Error:", e);
-                render(); // 에러 발생 시에도 기본 렌더링 시도
+                render();
             }
         }
 
@@ -150,33 +150,21 @@
         async function handleLogin() {
             const name = document.getElementById('nameInput').value.trim();
             if(!name) return;
-
-            // 로딩 표시
             document.getElementById('loginBtn').innerHTML = '<i class="fas fa-spinner animate-spin"></i> 확인 중...';
             document.getElementById('loginBtn').disabled = true;
 
             try {
-                // 정확한 경로: /artifacts/{appId}/public/data/users/{name}
                 const userRef = doc(STATE.db, 'artifacts', appId, 'public', 'data', 'users', name);
                 const snap = await getDoc(userRef);
-                
                 if(snap.exists()) {
                     STATE.user = snap.data();
-                    // 이수 완료자는 즉시 결과 화면으로
-                    if(STATE.user.status === 'passed') {
-                        STATE.view = 'result';
-                    } else {
-                        STATE.view = 'dashboard';
-                    }
+                    STATE.view = (STATE.user.status === 'passed') ? 'result' : 'dashboard';
                 } else {
-                    // 신규 사용자
                     STATE.user = { name, attempts: 0, status: 'none', score: 0 };
                     STATE.view = 'dashboard';
                 }
                 render();
             } catch (e) {
-                console.error("Login error:", e);
-                // 네트워크 오류 등으로 실패 시 데모 데이터로라도 진입 허용 (UX 고려)
                 STATE.user = { name, attempts: 0, status: 'none', score: 0 };
                 STATE.view = 'dashboard';
                 render();
@@ -267,16 +255,13 @@
                 score: score,
                 status: isPassed ? 'passed' : (newAttempts >= 3 ? 'blocked' : 'failed'),
                 attempts: newAttempts,
-                lastDate: new Date().toLocaleDateString()
+                lastDate: new Date().toLocaleDateString() // 'YYYY. M. D.' 형식
             };
 
-            // 서버에 저장
             try {
                 const userRef = doc(STATE.db, 'artifacts', appId, 'public', 'data', 'users', STATE.user.name);
                 await setDoc(userRef, resultData);
-            } catch (e) {
-                console.error("Save failed:", e);
-            }
+            } catch (e) { console.error(e); }
 
             STATE.user = resultData;
             STATE.view = 'result';
@@ -312,23 +297,21 @@
                     el.innerHTML = "";
                     const qrData = `SDI|${STATE.user.name.replace(/\s/g,'')}|${STATE.user.lastDate.replace(/\.\s/g,'-')}`;
                     new QRCode(el, {
-                        text: qrData,
-                        width: 150,
-                        height: 150,
-                        colorDark: "#0047BA",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.L
+                        text: qrData, width: 150, height: 150, colorDark: "#0047BA", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
                     });
                 }, 400);
             }
         }
 
+        // --- 관리자 기능 ---
+
         function renderAdmin() {
             document.getElementById('content').innerHTML = `
                 <div class="space-y-6 animate-in">
-                    <div class="flex border-b">
-                        <button onclick="window.setAdminTab('data')" id="tab-data" class="tab-btn flex-1 py-3 active">실시간 현황</button>
-                        <button onclick="window.setAdminTab('questions')" id="tab-questions" class="tab-btn flex-1 py-3">문제 관리</button>
+                    <div class="flex border-b overflow-x-auto">
+                        <button onclick="window.setAdminTab('data')" id="tab-data" class="tab-btn flex-1 py-3 px-2 active whitespace-nowrap">실시간 현황</button>
+                        <button onclick="window.setAdminTab('stats')" id="tab-stats" class="tab-btn flex-1 py-3 px-2 whitespace-nowrap">월별 통계</button>
+                        <button onclick="window.setAdminTab('questions')" id="tab-questions" class="tab-btn flex-1 py-3 px-2 whitespace-nowrap">문제 관리</button>
                     </div>
                     <div id="admin-sub-content"></div>
                 </div>`;
@@ -337,28 +320,49 @@
 
         let adminUnsubscribe = null;
 
+        // 엑셀 다운로드 기능
+        window.downloadRawData = () => {
+            if (!STATE.allUsersData || STATE.allUsersData.length === 0) {
+                alert("다운로드할 데이터가 없습니다.");
+                return;
+            }
+            const worksheet = XLSX.utils.json_to_sheet(STATE.allUsersData.map(u => ({
+                '성명': u.name,
+                '최근점수': u.score,
+                '상태': u.status === 'passed' ? '합격' : (u.status === 'blocked' ? '차단(3회)' : '미이수'),
+                '응시횟수': u.attempts,
+                '최종응시일': u.lastDate
+            })));
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+            XLSX.writeFile(workbook, `SDI_Safety_RawData_${new Date().toLocaleDateString()}.xlsx`);
+        };
+
         window.setAdminTab = async (tab) => {
             const sub = document.getElementById('admin-sub-content');
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             const targetTab = document.getElementById(`tab-${tab}`);
             if(targetTab) targetTab.classList.add('active');
 
-            if (adminUnsubscribe) {
-                adminUnsubscribe();
-                adminUnsubscribe = null;
-            }
+            if (adminUnsubscribe) { adminUnsubscribe(); adminUnsubscribe = null; }
 
             if(tab === 'data') {
                 sub.innerHTML = '<div class="text-center p-10"><i class="fas fa-circle-notch animate-spin text-blue-600"></i> 데이터 연결 중...</div>';
                 
-                const q = query(collection(STATE.db, 'artifacts', appId, 'public', 'data', 'users'));
-                adminUnsubscribe = onSnapshot(q, (snapshot) => {
-                    let list = [];
-                    snapshot.forEach(d => list.push(d.data()));
+                const qColl = query(collection(STATE.db, 'artifacts', appId, 'public', 'data', 'users'));
+                adminUnsubscribe = onSnapshot(qColl, (snapshot) => {
+                    STATE.allUsersData = [];
+                    snapshot.forEach(d => STATE.allUsersData.push(d.data()));
                     
                     sub.innerHTML = `
-                        <div class="space-y-2 max-h-[450px] overflow-y-auto">
-                            ${list.length > 0 ? list.map(i => `
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-xs font-bold text-gray-500">총 인원: ${STATE.allUsersData.length}명</span>
+                            <button onclick="window.downloadRawData()" class="px-3 py-1.5 bg-green-600 text-white text-[11px] rounded-lg font-bold flex items-center">
+                                <i class="fas fa-download mr-1"></i> RAW 엑셀 다운로드
+                            </button>
+                        </div>
+                        <div class="space-y-2 max-h-[400px] overflow-y-auto">
+                            ${STATE.allUsersData.length > 0 ? STATE.allUsersData.map(i => `
                                 <div class="p-4 border rounded-2xl flex justify-between items-center bg-white shadow-sm">
                                     <div class="flex flex-col">
                                         <span class="font-bold text-gray-800">${i.name}</span>
@@ -371,12 +375,52 @@
                                         <div class="text-[10px] text-gray-400">시도: ${i.attempts}회</div>
                                     </div>
                                 </div>
-                            `).join('') : '<p class="text-center py-10 text-gray-400">데이터가 존재하지 않습니다.</p>'}
+                            `).join('') : '<p class="text-center py-10 text-gray-400">데이터가 없습니다.</p>'}
                         </div>`;
-                }, (error) => {
-                    sub.innerHTML = `<div class="p-4 bg-red-50 text-red-500 text-sm rounded-xl">실시간 연결 오류: ${error.message}</div>`;
                 });
-            } else {
+            } 
+            else if(tab === 'stats') {
+                // 월별 통계 계산
+                const monthlyStats = {};
+                STATE.allUsersData.forEach(u => {
+                    if (!u.lastDate) return;
+                    const dateParts = u.lastDate.split('. '); // '2024. 5. 15'
+                    if (dateParts.length < 2) return;
+                    const monthKey = `${dateParts[0]}. ${dateParts[1]}`; // '2024. 5'
+                    
+                    if (!monthlyStats[monthKey]) monthlyStats[monthKey] = { total: 0, passed: 0 };
+                    monthlyStats[monthKey].total++;
+                    if (u.status === 'passed') monthlyStats[monthKey].passed++;
+                });
+
+                const sortedMonths = Object.keys(monthlyStats).sort((a,b) => b.localeCompare(a));
+
+                sub.innerHTML = `
+                    <div class="space-y-4 animate-in">
+                        <h4 class="font-bold text-gray-700 text-sm"><i class="fas fa-chart-bar mr-1"></i> 월별 교육 수료 현황</h4>
+                        <div class="grid grid-cols-1 gap-3">
+                            ${sortedMonths.length > 0 ? sortedMonths.map(m => `
+                                <div class="glass-card p-4 border border-blue-50">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-bold text-blue-900">${m}월</span>
+                                        <span class="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">수료율 ${Math.round((monthlyStats[m].passed / monthlyStats[m].total) * 100)}%</span>
+                                    </div>
+                                    <div class="flex space-x-4">
+                                        <div class="flex-1">
+                                            <p class="text-[10px] text-gray-400">총 응시</p>
+                                            <p class="text-lg font-black text-gray-700">${monthlyStats[m].total}명</p>
+                                        </div>
+                                        <div class="flex-1 border-l pl-4">
+                                            <p class="text-[10px] text-gray-400">수료자</p>
+                                            <p class="text-lg font-black text-green-600">${monthlyStats[m].passed}명</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('') : '<p class="text-center py-10 text-gray-400">통계 데이터가 없습니다.</p>'}
+                        </div>
+                    </div>`;
+            }
+            else {
                 sub.innerHTML = `
                     <div class="space-y-4 animate-in">
                         <div class="p-8 border-2 border-dashed border-gray-200 rounded-3xl text-center cursor-pointer hover:bg-gray-50 transition-colors" onclick="document.getElementById('excelFile').click()">
@@ -417,7 +461,7 @@
                             if(newList.length > 0) {
                                 STATE.questions = newList;
                                 await setDoc(doc(STATE.db, 'artifacts', appId, 'public', 'data', 'config', 'questionBank'), { list: newList });
-                                alert(`${newList.length}문항이 실제 서버에 반영되었습니다.`);
+                                alert(`${newList.length}문항이 반영되었습니다.`);
                                 window.setAdminTab('questions');
                             }
                         };
