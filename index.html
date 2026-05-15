@@ -2,443 +2,597 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SAMSUNG SDI 안전 교육 시스템</title>
+    <title>삼성SDI 안전 교육 및 평가</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, where, setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'sdi-safety-ulsan';
+
+        window.db = db;
+        window.appId = appId;
+        window.auth = auth;
+
+        // Firebase 인증 실행
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                console.log("Auth initialized successfully");
+            } catch (e) {
+                console.error("Auth initialization failed:", e);
+            }
+        };
+        initAuth();
+    </script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700&display=swap');
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8fafc; color: #1e293b; -webkit-tap-highlight-color: transparent; }
         .sdi-blue { color: #00377B; }
         .bg-sdi-blue { background-color: #00377B; }
-        .btn-sdi { background-color: #00377B; color: white; transition: background 0.2s; }
-        .btn-sdi:hover { background-color: #002a5d; }
-        .card { background: white; border-radius: 1rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-        .footer-text { font-size: 0.7rem; color: #94a3b8; text-align: center; padding: 1.5rem 0; }
-        input[type="radio"]:checked + label { border-color: #00377B; background-color: #eff6ff; }
-        .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .card { background: white; border-radius: 20px; box-shadow: 0 4px 25px rgba(0, 55, 123, 0.05); }
+        .hidden { display: none !important; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #00377B; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .admin-nav-btn { padding: 0.75rem 1rem; font-weight: 700; font-size: 0.85rem; border-bottom: 3px solid transparent; color: #64748b; }
+        .admin-nav-btn.active { color: #00377B; border-bottom-color: #00377B; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen">
 
-    <div id="app" class="flex-grow container mx-auto max-w-md md:max-w-4xl p-4 flex flex-col justify-center">
-        <!-- HEADER -->
-        <header class="text-center mb-6">
+    <!-- [사용자 화면] -->
+    <div id="user-app" class="container mx-auto max-w-md p-4 min-h-screen flex flex-col justify-center">
+        <header class="text-center mb-8">
             <h1 class="text-3xl font-black sdi-blue tracking-tighter">SAMSUNG SDI</h1>
-            <p class="text-xs font-bold text-slate-400">SAFETY FIRST · ULSAN</p>
+            <p class="text-[10px] font-bold text-slate-400 mt-1 tracking-[0.3em] uppercase">Safety Training Center</p>
         </header>
 
-        <!-- 1. AUTH SECTION -->
-        <section id="step-auth" class="card p-8 fade-in max-w-md mx-auto w-full">
-            <h2 class="text-xl font-bold mb-6 text-center text-slate-800">교육생 본인 인증</h2>
-            <div class="space-y-5">
-                <div>
-                    <label class="block text-sm font-semibold text-slate-600 mb-2">성명</label>
-                    <input type="text" id="user-name" placeholder="성명을 입력하세요" class="w-full border-2 border-slate-200 p-4 rounded-xl focus:border-blue-600 outline-none transition-all">
-                </div>
-                <button onclick="handleAuth()" class="w-full btn-sdi py-4 rounded-xl font-bold text-lg shadow-lg">평가 시작하기</button>
-                <div class="pt-4 border-t border-slate-100 flex justify-center">
-                    <button onclick="showAdminLogin()" class="text-xs text-slate-400 hover:text-slate-600 underline">관리자 모드 접속</button>
+        <!-- 입장 화면 -->
+        <section id="view-auth" class="card p-8">
+            <h2 class="text-xl font-bold mb-6 text-center">안전 교육 평가 시스템</h2>
+            <div class="space-y-4">
+                <input type="text" id="input-name" placeholder="성명을 입력하세요" class="w-full bg-slate-50 border-2 border-transparent p-4 rounded-2xl focus:border-[#00377B] outline-none text-center text-lg font-medium">
+                <button onclick="handleStart()" class="w-full bg-sdi-blue text-white py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-all">평가 시작하기</button>
+                <div class="pt-4 flex justify-center">
+                    <button onclick="showAdminLogin()" class="text-xs text-slate-300 underline">관리자 로그인</button>
                 </div>
             </div>
         </section>
 
-        <!-- 2. QUIZ SECTION -->
-        <section id="step-quiz" class="card p-6 hidden max-w-md mx-auto w-full">
-            <div class="flex justify-between items-center mb-6">
-                <div id="quiz-progress" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">Question 1 / 10</div>
-                <button onclick="prevQuestion()" id="btn-back" class="text-xs font-bold text-slate-500 flex items-center hover:text-slate-800">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg> 이전으로
-                </button>
-            </div>
-            <div class="mb-8">
-                <h3 id="quiz-question" class="text-xl font-bold text-slate-800 leading-tight">질문을 불러오는 중...</h3>
-            </div>
-            <div id="quiz-options" class="space-y-3">
-                <!-- Options injected here -->
-            </div>
-        </section>
-
-        <!-- 3. RESULT SECTION -->
-        <section id="step-result" class="card p-8 hidden text-center max-w-md mx-auto w-full">
-            <div id="result-icon" class="mb-4"></div>
-            <h2 class="text-2xl font-bold text-slate-800" id="result-title">평가 결과</h2>
-            <div class="text-6xl font-black my-6 sdi-blue" id="result-score">0점</div>
-            
-            <div id="result-status-banner" class="p-4 rounded-xl mb-8 font-bold text-lg"></div>
-
-            <!-- 이수 QR 영역 -->
-            <div id="pass-qr-container" class="hidden mb-8 p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                <p class="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">이수 완료 인증 QR</p>
-                <div id="qrcode" class="flex justify-center mb-4"></div>
-                <p class="text-[10px] text-slate-400" id="qr-serial"></p>
-            </div>
-
-            <!-- 과락 안내 영역 -->
-            <div id="fail-container" class="hidden mb-8">
-                <p class="text-red-500 font-bold mb-2">총점 80점 미만으로 과락되었습니다.</p>
-                <p class="text-sm text-slate-500 mb-4">재교육 이수 후 다시 응시해 주시기 바랍니다.</p>
-                <p id="fail-attempts" class="text-xs font-bold text-red-600 bg-red-50 py-2 rounded-lg"></p>
-            </div>
-
-            <button onclick="goMain()" class="w-full bg-slate-100 text-slate-600 py-4 rounded-xl font-bold hover:bg-slate-200 transition">메인으로 돌아가기</button>
-        </section>
-
-        <!-- 4. ADMIN DASHBOARD (PC Optimized) -->
-        <section id="step-admin-dash" class="card p-8 hidden max-w-4xl mx-auto w-full overflow-hidden">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-800">관리자 대시보드</h2>
-                    <p class="text-sm text-slate-500">삼성SDI 울산 사업장 현황 관리</p>
-                </div>
-                <div class="flex gap-2">
-                    <button onclick="exportData()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md">Raw Data 추출 (Excel)</button>
-                    <button onclick="goMain()" class="bg-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-bold">로그아웃</button>
-                </div>
-            </div>
-
-            <!-- Stat Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <div class="p-6 bg-blue-50 rounded-2xl border border-blue-100">
-                    <p class="text-sm text-blue-600 font-bold mb-1">총 응시 건수</p>
-                    <h4 id="stat-total" class="text-3xl font-black text-blue-900">0</h4>
-                </div>
-                <div class="p-6 bg-emerald-50 rounded-2xl border border-emerald-100">
-                    <p class="text-sm text-emerald-600 font-bold mb-1">이수자 수</p>
-                    <h4 id="stat-pass" class="text-3xl font-black text-emerald-900">0</h4>
-                </div>
-                <div class="p-6 bg-rose-50 rounded-2xl border border-rose-100">
-                    <p class="text-sm text-rose-600 font-bold mb-1">평균 점수</p>
-                    <h4 id="stat-avg" class="text-3xl font-black text-rose-900">0점</h4>
-                </div>
-            </div>
-
-            <!-- Monthly Chart & Upload -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                <div class="card p-4 border border-slate-100 shadow-none">
-                    <h5 class="text-sm font-bold mb-4">월별 이수 현황</h5>
-                    <canvas id="monthlyChart" height="200"></canvas>
-                </div>
-                <div class="space-y-4">
-                    <div class="p-4 bg-slate-50 rounded-xl">
-                        <h5 class="text-sm font-bold mb-3">문제은행 관리</h5>
-                        <button onclick="downloadExcelTemplate()" class="w-full text-xs bg-white border border-slate-200 p-2 rounded mb-2 hover:bg-slate-100 text-slate-600">📥 업로드 양식 다운로드</button>
-                        <input type="file" id="file-upload" class="text-[10px] w-full mb-2" accept=".xlsx,.pdf,.txt">
-                        <button onclick="alert('파일이 업로드되었습니다.')" class="w-full bg-slate-800 text-white py-2 rounded text-xs font-bold">파일 적용</button>
+        <!-- 퀴즈 화면 -->
+        <section id="view-quiz" class="card p-6 hidden">
+            <div id="quiz-ui">
+                <div class="flex justify-between items-center mb-6">
+                    <span id="quiz-progress" class="bg-blue-50 text-[#00377B] px-3 py-1 rounded-full text-xs font-bold font-mono">01 / 10</span>
+                    <div class="h-1.5 w-32 bg-slate-100 rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-sdi-blue transition-all" style="width: 10%"></div>
                     </div>
-                    <button onclick="changeAdminPw()" class="w-full text-xs text-slate-400 py-2 border border-slate-100 rounded">관리자 비밀번호 변경</button>
+                </div>
+                <h3 id="quiz-question" class="text-lg font-bold mb-8 text-slate-800 leading-snug"></h3>
+                <div id="quiz-options" class="space-y-3"></div>
+                <div class="mt-8 pt-4 border-t border-slate-50 flex justify-between items-center">
+                    <button id="btn-prev" onclick="handlePrev()" class="text-slate-400 font-bold text-sm">이전 문제</button>
+                    <span class="text-[9px] text-slate-300 font-mono italic">SAFETY FIRST</span>
+                </div>
+            </div>
+            <div id="quiz-saving" class="hidden py-20 text-center">
+                <div class="loader mb-4"></div>
+                <p class="font-bold text-slate-500">데이터 저장 중...</p>
+            </div>
+        </section>
+
+        <!-- 결과 화면 -->
+        <section id="view-result" class="card p-8 hidden text-center">
+            <div id="result-icon" class="w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 text-4xl"></div>
+            <h2 class="text-2xl font-bold text-slate-800">평가 완료</h2>
+            <div id="result-score" class="text-6xl font-black my-6 sdi-blue">0점</div>
+            <div id="result-msg" class="p-4 rounded-2xl mb-8 font-bold text-sm"></div>
+            <div id="qr-area" class="hidden bg-slate-50 p-6 rounded-3xl border-2 border-dashed border-slate-200 mb-8">
+                <div id="qrcode" class="flex justify-center mb-4"></div>
+                <p id="qr-info" class="text-[11px] text-slate-500 font-mono"></p>
+            </div>
+            <button onclick="resetToMain()" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold">메인으로</button>
+        </section>
+    </div>
+
+    <!-- [관리자 화면] -->
+    <div id="admin-app" class="hidden min-h-screen bg-slate-50">
+        <nav class="bg-white border-b sticky top-0 z-10">
+            <div class="container mx-auto px-4 flex justify-between items-center h-16">
+                <div class="flex items-center gap-2">
+                    <span class="font-black sdi-blue text-xl">ADMIN</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button onclick="setAdminTab('dash')" id="tab-dash" class="admin-nav-btn active">대시보드</button>
+                    <button onclick="setAdminTab('records')" id="tab-records" class="admin-nav-btn">응시 기록</button>
+                    <button onclick="setAdminTab('manage')" id="tab-manage" class="admin-nav-btn">운영 관리</button>
+                    <button onclick="resetToMain()" class="ml-4 text-rose-500 text-xs font-bold uppercase">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="container mx-auto p-4 md:p-8">
+            <!-- 탭: 대시보드 -->
+            <div id="admin-view-dash" class="space-y-6">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="card p-5 border-l-4 border-blue-600">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Total</p>
+                        <p id="stat-total" class="text-2xl font-black">0</p>
+                    </div>
+                    <div class="card p-5 border-l-4 border-emerald-500">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Passed</p>
+                        <p id="stat-pass" class="text-2xl font-black">0</p>
+                    </div>
+                    <div class="card p-5 border-l-4 border-amber-400">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Average</p>
+                        <p id="stat-avg" class="text-2xl font-black">0</p>
+                    </div>
+                    <div class="card p-5 border-l-4 border-indigo-500">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Rate</p>
+                        <p id="stat-rate" class="text-2xl font-black">0%</p>
+                    </div>
+                </div>
+                <div class="card p-6">
+                    <h3 class="font-bold mb-6 text-slate-800">월별 교육 현황 (응시 / 이수완료 / 미이수)</h3>
+                    <div class="h-64 md:h-96"><canvas id="adminChart"></canvas></div>
                 </div>
             </div>
 
-            <!-- Response Table -->
-            <div class="mt-8">
-                <h5 class="text-lg font-bold mb-4 text-slate-800">응시 진행 현황 상세</h5>
-                <div class="table-container border rounded-xl">
-                    <table class="w-full text-sm text-left">
-                        <thead class="bg-slate-50 border-b">
+            <!-- 탭: 응시 기록 -->
+            <div id="admin-view-records" class="hidden space-y-4">
+                <div class="flex justify-between items-center px-1">
+                    <h3 class="font-bold text-slate-800">응시 데이터 RAW DATA</h3>
+                    <button onclick="exportExcel()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold">엑셀 다운로드</button>
+                </div>
+                <div class="card overflow-x-auto">
+                    <table class="w-full text-left min-w-[600px]">
+                        <thead class="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase border-b">
                             <tr>
-                                <th class="p-4 font-bold text-slate-600">응시일</th>
-                                <th class="p-4 font-bold text-slate-600">성명</th>
-                                <th class="p-4 font-bold text-slate-600">점수</th>
-                                <th class="p-4 font-bold text-slate-600">이수여부</th>
-                                <th class="p-4 font-bold text-slate-600 text-center">응시횟수</th>
+                                <th class="p-4">일시</th><th class="p-4">성명</th><th class="p-4 text-center">점수</th><th class="p-4 text-center">결과</th><th class="p-4 text-center">시도</th><th class="p-4">UID</th>
                             </tr>
                         </thead>
-                        <tbody id="admin-table-body" class="divide-y">
-                            <!-- Rows injected here -->
-                        </tbody>
+                        <tbody id="admin-table-body" class="divide-y text-sm"></tbody>
                     </table>
                 </div>
             </div>
-        </section>
 
-        <!-- ADMIN LOGIN -->
-        <section id="step-admin-login" class="card p-8 hidden max-w-md mx-auto w-full">
-            <h2 class="text-xl font-bold mb-6 text-center">관리자 인증</h2>
-            <input type="password" id="admin-pw" placeholder="비밀번호 입력" class="w-full border-2 p-4 rounded-xl mb-4 outline-none focus:border-slate-800">
-            <div class="flex gap-2">
-                <button onclick="goMain()" class="flex-1 bg-slate-100 py-4 rounded-xl font-bold">취소</button>
-                <button onclick="handleAdminLogin()" class="flex-1 bg-slate-800 text-white py-4 rounded-xl font-bold">로그인</button>
+            <!-- 탭: 운영 관리 -->
+            <div id="admin-view-manage" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="card p-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg">문제은행 엑셀 업로드</h3>
+                        <button onclick="downloadQuizTemplate()" class="text-blue-600 text-xs font-bold flex items-center gap-1 hover:underline">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                            양식 다운로드
+                        </button>
+                    </div>
+                    <div class="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center bg-slate-50 relative cursor-pointer hover:border-blue-400 transition-colors">
+                        <input type="file" id="quiz-file" accept=".xlsx, .xls" class="absolute inset-0 opacity-0 cursor-pointer" onchange="importQuizExcel(this)">
+                        <p class="text-sm font-bold text-slate-600" id="file-status">파일을 선택하거나 이리로 끌어오세요</p>
+                        <p class="text-[10px] text-slate-400 mt-2">[질문, 보기1, 보기2, 보기3, 보기4, 정답(0-3)]</p>
+                    </div>
+                </div>
+                <div class="card p-8">
+                    <h3 class="font-bold text-lg mb-6">관리자 비밀번호 변경</h3>
+                    <div class="space-y-4">
+                        <input type="password" id="new-pw" placeholder="새 비밀번호" class="w-full bg-slate-50 p-4 rounded-xl outline-none border focus:border-blue-400">
+                        <input type="password" id="confirm-pw" placeholder="비밀번호 확인" class="w-full bg-slate-50 p-4 rounded-xl outline-none border focus:border-blue-400">
+                        <button onclick="changeAdminPassword()" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold">비밀번호 변경 적용</button>
+                    </div>
+                </div>
             </div>
-        </section>
-
+        </main>
     </div>
 
-    <footer class="footer-text">SAMSUNG SDI ULSAN</footer>
+    <!-- 로그인 모달 -->
+    <div id="admin-login-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="card w-full max-w-sm p-8">
+            <h2 class="text-xl font-bold mb-6 text-center">관리자 인증</h2>
+            <div id="login-form-area">
+                <input type="password" id="admin-pw-input" placeholder="비밀번호" class="w-full bg-slate-50 p-4 rounded-2xl mb-4 text-center font-mono outline-none border-2 border-transparent focus:border-blue-600">
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="document.getElementById('admin-login-modal').classList.add('hidden')" class="bg-slate-100 py-4 rounded-2xl font-bold text-slate-500">취소</button>
+                    <button onclick="processAdminLogin()" id="btn-login-submit" class="bg-sdi-blue text-white py-4 rounded-2xl font-bold">확인</button>
+                </div>
+            </div>
+            <div id="login-loading-area" class="hidden text-center py-6">
+                <div class="loader mb-2"></div>
+                <p class="text-sm font-bold text-slate-500">인증 중...</p>
+            </div>
+        </div>
+    </div>
 
     <script>
-        // --- DATA & STATE ---
-        let adminPassword = "1234";
-        let currentUserName = "";
-        let currentUserId = "";
-        let records = JSON.parse(localStorage.getItem('sdi_safety_v2_records') || '[]');
-        let chartInstance = null;
-
-        const quizPool = [
-            { q: "전기화재 발생 시 가장 적절한 소화기는?", a: ["K급 소화기", "이산화탄소 소화기", "포말 소화기", "물 소화기"], r: 1 },
-            { q: "LOTO(Lock Out Tag Out)는 언제 실시합니까?", a: ["작업 종료 후", "점심 시간", "정비 작업 전", "회의 시"], r: 2 },
-            { q: "밀폐공간 작업 시 가장 먼저 확인해야 할 사항은?", a: ["공사 기한", "조명 밝기", "산소 농도", "통신 수단"], r: 2 },
-            { q: "삼성SDI 5대 안전수칙이 아닌 것은?", a: ["보호구 착용", "임의 가동 금지", "LOTO 미준수", "작업허가 준수"], r: 2 },
-            { q: "지게차 운행 시 시야가 확보되지 않으면 어떻게 해야 하나요?", a: ["빠르게 통과", "경적을 계속 울림", "유도자 배치 및 후진", "그냥 운행"], r: 2 },
-            { q: "화학물질 취급 전 확인해야 하는 문서는?", a: ["일기예보", "MSDS(물질안전보건자료)", "출근부", "영수증"], r: 1 },
-            { q: "안전모의 유효기간은 보통 얼마입니까?", a: ["1년", "2년", "5년", "제한없음"], r: 1 },
-            { q: "정전기 방지를 위한 필수 장비는?", a: ["장갑", "제전복/제전화", "면마스크", "이어플러그"], r: 1 },
-            { q: "중량물 들 때 올바른 자세는?", a: ["허리만 굽힌다", "무릎을 굽히고 허리를 편다", "반동을 이용한다", "팔만 사용한다"], r: 1 },
-            { q: "응급상황 발생 시 가장 먼저 연락해야 할 곳은?", a: ["가족", "인근 병원", "현장 상황실/119", "동료"], r: 2 },
-            { q: "고소 작업 시 안전대 체결 기준 높이는?", a: ["1.5m 이상", "2m 이상", "3m 이상", "5m 이상"], r: 1 },
-            { q: "안전화의 주 목적은 무엇입니까?", a: ["패션 유지", "발 보호", "피로 방지", "통풍"], r: 1 },
-            { q: "화재의 3요소가 아닌 것은?", a: ["가연물", "산소", "점화원", "이산화탄소"], r: 3 },
-            { q: "보호구 미착용 작업 시 조치는?", a: ["즉시 중단 및 착용", "나중에 착용", "그냥 계속 작업", "동료가 빌려줌"], r: 0 },
-            { q: "계단 이용 시 안전 수칙은?", a: ["뛰어내려가기", "난간 잡고 이용", "핸드폰 보며 걷기", "두 칸씩 오르기"], r: 1 },
-            { q: "유해물질이 눈에 들어갔을 때 응급처치는?", a: ["비빈다", "흐르는 물에 15분 이상 씻는다", "안약을 넣는다", "그대로 둔다"], r: 1 },
-            { q: "소화전 사용 시 노즐은 어디를 향하나?", a: ["천장", "화염의 뿌리", "연기 부분", "자기 발 앞"], r: 1 },
-            { q: "추락방지용 안전대 설치 위치는?", a: ["발 밑", "허리 높이", "머리 위쪽 지지점", "아무데나"], r: 2 },
-            { q: "안전점검의 가장 큰 목적은?", a: ["벌금 부과", "사고 예방", "시설물 감상", "인원 파악"], r: 1 },
-            { q: "현장 내 금연 구역에서의 흡연은?", a: ["허용됨", "안전수칙 위반", "조심하면 됨", "화장실에선 됨"], r: 1 }
+        // 기본 데이터 및 상태
+        let CURRENT_QUIZ = [
+            { q: "전기화재 발생 시 가장 적합한 소화기는?", a: ["K급 소화기", "이산화탄소(CO2) 소화기", "포말 소화기", "강화액 소화기"], r: 1 },
+            { q: "LOTO 시스템을 실시하는 가장 주된 목적은?", a: ["유지보수 비용 절감", "임의 가동으로 인한 협착 예방", "작업자의 이동 경로 파악", "전력 소비 효율화"], r: 1 },
+            { q: "밀폐공간 출입 전 가장 먼저 측정해야 할 항목은?", a: ["조도", "소음", "산소 및 유해가스", "습도"], r: 2 },
+            { q: "삼성SDI 5대 안전수칙 중 '보호구' 수칙은?", a: ["필요할 때만 착용", "규정된 보호구 철저 착용", "미착용 시 자율 작업", "작업복만 입으면 생략"], r: 1 },
+            { q: "지게차 운행 시 시야가 확보되지 않는 경우 조치는?", a: ["전진 가속", "유도자 배치 및 후진 운행", "전방 주시 서행", "그대로 운행"], r: 1 },
+            { q: "화학물질 취급 전 반드시 확인해야 하는 자료는?", a: ["날씨 예보", "MSDS(물질안전보건자료)", "작업 일보", "급여 명세서"], r: 1 },
+            { q: "안전모의 올바른 착용 방법이 아닌 것은?", a: ["턱끈 조절", "머리 크기 조절", "라이너 사용", "더우면 턱끈 풀기"], r: 3 },
+            { q: "추락 방지를 위한 '안전대' 체결 위치는?", a: ["발 아래", "허리 아래", "머리 위쪽 지지점", "아무데나"], r: 2 },
+            { q: "중량물을 들어올릴 때 올바른 자세는?", a: ["허리를 굽혀서", "무릎을 굽히고 허리를 펴서", "팔 힘으로만", "반동 이용"], r: 1 },
+            { q: "소화기 사용법 PASS 원칙 중 S(Sweep)의 의미는?", a: ["멈추기", "핀 당기기", "골고루 비질하기", "손잡이 쥐기"], r: 2 }
         ];
 
-        let selectedQuiz = [];
-        let currentQuizIndex = 0;
-        let userAnswers = [];
+        let state = {
+            name: '',
+            questions: [],
+            currentIndex: 0,
+            answers: new Array(10).fill(null),
+            allRecords: []
+        };
 
-        // --- CORE LOGIC ---
+        let adminUnsubscribe = null;
+        let adminChart = null;
 
-        function handleAuth() {
-            const name = document.getElementById('user-name').value.trim();
-            if (!name) return alert("성명을 입력하세요.");
-
-            // 동명이인 처리
-            const sameNameCount = [...new Set(records.map(r => r.id))].filter(id => id.startsWith(name)).length;
-            currentUserId = sameNameCount > 0 && !records.find(r => r.id === name) ? `${name}_${sameNameCount + 1}` : name;
-            currentUserName = name;
-
-            // 기존 이수 여부 확인
-            const lastPass = records.filter(r => r.id === currentUserId && r.isPassed).pop();
-            if (lastPass) {
-                showResult(lastPass.score, true, lastPass.attempt);
-                return;
-            }
-
-            // 과락 횟수 체크
-            const attempts = records.filter(r => r.id === currentUserId).length;
-            if (attempts >= 3) return alert("3회 과락으로 응시가 제한됩니다. 관리자에게 문의하세요.");
-
-            startQuiz();
+        // 화면 제어
+        function showUserView(id) {
+            ['view-auth', 'view-quiz', 'view-result'].forEach(v => {
+                const el = document.getElementById(v);
+                if (el) el.classList.add('hidden');
+            });
+            const target = document.getElementById(id);
+            if (target) target.classList.remove('hidden');
         }
 
-        function startQuiz() {
-            selectedQuiz = [...quizPool].sort(() => 0.5 - Math.random()).slice(0, 10);
-            currentQuizIndex = 0;
-            userAnswers = [];
-            showStep('step-quiz');
+        function resetToMain() {
+            document.getElementById('admin-app').classList.add('hidden');
+            document.getElementById('user-app').classList.remove('hidden');
+            if (adminUnsubscribe) adminUnsubscribe();
+            state.name = '';
+            document.getElementById('input-name').value = '';
+            showUserView('view-auth');
+        }
+
+        // 시험 로직
+        async function handleStart() {
+            const nameInput = document.getElementById('input-name').value.trim();
+            if (!nameInput) return alert("성명을 입력하세요.");
+            state.name = nameInput;
+
+            try {
+                const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js");
+                const quizRef = doc(window.db, 'artifacts', window.appId, 'public', 'settings', 'quiz_bank');
+                const quizSnap = await getDoc(quizRef);
+                if (quizSnap.exists()) { CURRENT_QUIZ = quizSnap.data().questions; }
+            } catch (e) {}
+
+            state.questions = [...CURRENT_QUIZ].sort(() => 0.5 - Math.random()).slice(0, 10);
+            state.currentIndex = 0;
+            state.answers = new Array(10).fill(null);
+            showUserView('view-quiz');
             renderQuestion();
         }
 
         function renderQuestion() {
-            const q = selectedQuiz[currentQuizIndex];
-            document.getElementById('quiz-progress').innerText = `Question ${currentQuizIndex + 1} / 10`;
+            const q = state.questions[state.currentIndex];
+            document.getElementById('quiz-progress').innerText = `${(state.currentIndex + 1).toString().padStart(2, '0')} / 10`;
+            document.getElementById('progress-bar').style.width = `${(state.currentIndex + 1) * 10}%`;
             document.getElementById('quiz-question').innerText = q.q;
-            document.getElementById('btn-back').style.visibility = currentQuizIndex > 0 ? 'visible' : 'hidden';
+
+            const btnPrev = document.getElementById('btn-prev');
+            state.currentIndex === 0 ? btnPrev.classList.add('invisible') : btnPrev.classList.remove('invisible');
 
             const container = document.getElementById('quiz-options');
             container.innerHTML = '';
             q.a.forEach((opt, idx) => {
-                const btn = document.createElement('div');
-                btn.className = "relative";
-                btn.innerHTML = `
-                    <input type="radio" name="quiz" id="opt${idx}" class="hidden" onclick="selectAnswer(${idx})">
-                    <label for="opt${idx}" class="block p-4 border-2 border-slate-100 rounded-xl cursor-pointer hover:border-slate-300 transition font-medium">
-                        ${idx + 1}. ${opt}
-                    </label>
-                `;
+                const isSelected = state.answers[state.currentIndex] === idx;
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left p-4 rounded-xl flex items-center font-medium border-2 transition-all ${isSelected ? 'bg-blue-50 border-blue-500' : 'bg-white border-slate-100'}`;
+                btn.innerHTML = `<span class="w-7 h-7 rounded-full ${isSelected ? 'bg-sdi-blue text-white' : 'bg-slate-100 text-slate-400'} flex items-center justify-center text-xs font-bold mr-3">${idx+1}</span><span class="text-sm">${opt}</span>`;
+                btn.onclick = () => {
+                    state.answers[state.currentIndex] = idx;
+                    if (state.currentIndex < 9) {
+                        state.currentIndex++; renderQuestion();
+                    } else {
+                        finishExam();
+                    }
+                };
                 container.appendChild(btn);
             });
         }
 
-        function selectAnswer(idx) {
-            userAnswers[currentQuizIndex] = idx;
-            // 자동 이동
-            setTimeout(() => {
-                if (currentQuizIndex < 9) {
-                    currentQuizIndex++;
-                    renderQuestion();
-                } else {
-                    finalizeQuiz();
-                }
-            }, 300);
-        }
+        function handlePrev() { if(state.currentIndex > 0) { state.currentIndex--; renderQuestion(); } }
 
-        function prevQuestion() {
-            if (currentQuizIndex > 0) {
-                currentQuizIndex--;
-                renderQuestion();
-            }
-        }
+        async function finishExam() {
+            document.getElementById('quiz-ui').classList.add('hidden');
+            document.getElementById('quiz-saving').classList.remove('hidden');
 
-        function finalizeQuiz() {
-            let correctCount = 0;
-            selectedQuiz.forEach((q, i) => { if (q.r === userAnswers[i]) correctCount++; });
-            const score = correctCount * 10;
-            const isPassed = score >= 80;
-            const attempts = records.filter(r => r.id === currentUserId).length + 1;
+            let score = 0;
+            state.questions.forEach((q, i) => { if (q.r === state.answers[i]) score += 10; });
+            const passed = score >= 80;
+            const uid = "SDI-" + Math.random().toString(36).substr(2, 7).toUpperCase();
+            const ts = new Date().toISOString();
 
-            const record = {
-                id: currentUserId,
-                name: currentUserName,
-                score: score,
-                isPassed: isPassed,
-                attempt: attempts,
-                date: new Date().toISOString()
-            };
+            try {
+                const { collection, addDoc, getDocs, query, where } = await import("https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js");
+                const q = query(collection(window.db, 'artifacts', window.appId, 'public', 'data', 'exam_records'), where("name", "==", state.name));
+                const snap = await getDocs(q);
+                await addDoc(collection(window.db, 'artifacts', window.appId, 'public', 'data', 'exam_records'), {
+                    name: state.name, score, passed, uid, timestamp: ts, attempt: snap.size + 1
+                });
+            } catch (e) { console.error("Save failed:", e); }
 
-            records.push(record);
-            localStorage.setItem('sdi_safety_v2_records', JSON.stringify(records));
-            showResult(score, isPassed, attempts);
-        }
-
-        function showResult(score, isPassed, attempt) {
-            showStep('step-result');
+            showUserView('view-result');
             document.getElementById('result-score').innerText = `${score}점`;
-            const banner = document.getElementById('result-status-banner');
-            const qrBox = document.getElementById('pass-qr-container');
-            const failBox = document.getElementById('fail-container');
+            const icon = document.getElementById('result-icon');
+            const msg = document.getElementById('result-msg');
+            const qrArea = document.getElementById('qr-area');
 
-            if (isPassed) {
-                banner.className = "p-4 rounded-xl mb-8 font-bold text-lg bg-emerald-100 text-emerald-700";
-                banner.innerText = "교육 이수 완료 (PASS)";
-                qrBox.classList.remove('hidden');
-                failBox.classList.add('hidden');
-                generateQR(currentUserId);
+            if (passed) {
+                icon.innerHTML = "🏆"; icon.className = "w-20 h-20 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-6 text-4xl";
+                msg.innerText = "안전 교육 이수가 완료되었습니다."; msg.className = "p-4 rounded-2xl mb-8 font-bold bg-emerald-50 text-emerald-700";
+                qrArea.classList.remove('hidden');
+                document.getElementById('qr-info').innerText = `${uid} | ${state.name}`;
+                document.getElementById("qrcode").innerHTML = "";
+                new QRCode(document.getElementById("qrcode"), { text: `SDI_PASS:${uid}:${state.name}`, width: 120, height: 120 });
             } else {
-                banner.className = "p-4 rounded-xl mb-8 font-bold text-lg bg-rose-100 text-rose-700";
-                banner.innerText = "평가 과락 (FAIL)";
-                qrBox.classList.add('hidden');
-                failBox.classList.remove('hidden');
-                document.getElementById('fail-attempts').innerText = `응시 횟수: ${attempt} / 3회`;
+                icon.innerHTML = "⚠️"; icon.className = "w-20 h-20 mx-auto rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-6 text-4xl";
+                msg.innerText = "불합격입니다. (80점 이상 합격)"; msg.className = "p-4 rounded-2xl mb-8 font-bold bg-rose-50 text-rose-700";
+                qrArea.classList.add('hidden');
             }
         }
 
-        function generateQR(userId) {
-            const container = document.getElementById("qrcode");
-            container.innerHTML = "";
-            const serial = `SDI-ULSAN-${userId}-${Date.now().toString(36).toUpperCase()}`;
-            new QRCode(container, { text: serial, width: 160, height: 160, colorDark: "#00377B" });
-            document.getElementById('qr-serial').innerText = serial;
+        // 관리자 인증 로직
+        function showAdminLogin() { 
+            document.getElementById('admin-login-modal').classList.remove('hidden'); 
+            document.getElementById('admin-pw-input').value = '';
+            document.getElementById('login-form-area').classList.remove('hidden');
+            document.getElementById('login-loading-area').classList.add('hidden');
         }
 
-        // --- ADMIN DASHBOARD LOGIC ---
+        async function processAdminLogin() {
+            const pwInput = document.getElementById('admin-pw-input').value;
+            if (!pwInput) return alert("비밀번호를 입력하세요.");
 
-        function handleAdminLogin() {
-            if (document.getElementById('admin-pw').value === adminPassword) {
-                showAdminDashboard();
-            } else {
-                alert("비밀번호가 일치하지 않습니다.");
+            document.getElementById('login-form-area').classList.add('hidden');
+            document.getElementById('login-loading-area').classList.remove('hidden');
+
+            try {
+                const { doc, getDoc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js");
+                const authRef = doc(window.db, 'artifacts', window.appId, 'public', 'settings', 'admin_auth');
+                const authSnap = await getDoc(authRef);
+                
+                let dbPw = "1234"; // 기본값
+                if (authSnap.exists()) {
+                    dbPw = authSnap.data().password;
+                } else {
+                    await setDoc(authRef, { password: "1234" });
+                }
+
+                if (pwInput === dbPw) {
+                    document.getElementById('admin-login-modal').classList.add('hidden');
+                    enterAdminMode();
+                } else {
+                    alert("비밀번호가 틀렸습니다.");
+                    showAdminLogin();
+                }
+            } catch (e) {
+                if (pwInput === "1234") {
+                    document.getElementById('admin-login-modal').classList.add('hidden');
+                    enterAdminMode();
+                } else {
+                    alert("시스템 오류 또는 비밀번호가 틀렸습니다.");
+                    showAdminLogin();
+                }
             }
         }
 
-        function showAdminDashboard() {
-            showStep('step-admin-dash');
-            updateStats();
-            renderAdminTable();
-            renderChart();
+        function enterAdminMode() {
+            document.getElementById('user-app').classList.add('hidden');
+            document.getElementById('admin-app').classList.remove('hidden');
+            setAdminTab('dash');
+            syncAdminData();
         }
 
-        function updateStats() {
-            const total = records.length;
-            const passed = records.filter(r => r.isPassed).length;
-            const avg = total > 0 ? Math.round(records.reduce((a, b) => a + b.score, 0) / total) : 0;
+        function setAdminTab(tab) {
+            ['dash', 'records', 'manage'].forEach(t => {
+                document.getElementById(`admin-view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('active');
+            });
+            document.getElementById(`admin-view-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+        }
+
+        async function syncAdminData() {
+            const { collection, onSnapshot, query, orderBy } = await import("https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js");
+            const q = query(collection(window.db, 'artifacts', window.appId, 'public', 'data', 'exam_records'), orderBy('timestamp', 'desc'));
+            
+            if (adminUnsubscribe) adminUnsubscribe();
+            adminUnsubscribe = onSnapshot(q, (snap) => {
+                const recs = [];
+                snap.forEach(d => recs.push(d.data()));
+                state.allRecords = recs;
+                renderDashboard();
+                renderTable();
+            });
+        }
+
+        function renderDashboard() {
+            const recs = state.allRecords;
+            const total = recs.length;
+            const pass = recs.filter(r => r.passed).length;
+            const fail = total - pass;
+            const avg = total > 0 ? Math.round(recs.reduce((a, b) => a + b.score, 0) / total) : 0;
+            const rate = total > 0 ? Math.round((pass / total) * 100) : 0;
 
             document.getElementById('stat-total').innerText = total;
-            document.getElementById('stat-pass').innerText = passed;
-            document.getElementById('stat-avg').innerText = `${avg}점`;
-        }
+            document.getElementById('stat-pass').innerText = pass;
+            document.getElementById('stat-avg').innerText = avg;
+            document.getElementById('stat-rate').innerText = rate + "%";
 
-        function renderAdminTable() {
-            const tbody = document.getElementById('admin-table-body');
-            tbody.innerHTML = '';
-            
-            // 최신순 정렬
-            [...records].reverse().forEach(r => {
-                const date = new Date(r.date).toLocaleString('ko-KR', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="p-4 text-xs text-slate-500">${date}</td>
-                    <td class="p-4 font-bold">${r.name} <span class="text-[10px] text-slate-300 font-normal">#${r.id}</span></td>
-                    <td class="p-4 font-mono">${r.score}점</td>
-                    <td class="p-4">
-                        <span class="px-2 py-1 rounded-full text-[10px] font-bold ${r.isPassed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-                            ${r.isPassed ? 'PASS' : 'FAIL'}
-                        </span>
-                    </td>
-                    <td class="p-4 text-center font-bold text-slate-400">${r.attempt}회</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        function renderChart() {
-            const ctx = document.getElementById('monthlyChart').getContext('2d');
+            // 월별 데이터 집계
             const months = {};
-            records.forEach(r => {
-                const m = new Date(r.date).toLocaleString('ko-KR', { month: 'long' });
-                if(!months[m]) months[m] = { total: 0, pass: 0 };
+            recs.forEach(r => {
+                const m = r.timestamp.substring(0, 7); // YYYY-MM
+                if(!months[m]) months[m] = { total: 0, pass: 0, fail: 0 };
                 months[m].total++;
-                if(r.isPassed) months[m].pass++;
+                if(r.passed) months[m].pass++;
+                else months[m].fail++;
             });
-
-            if (chartInstance) chartInstance.destroy();
-
-            chartInstance = new Chart(ctx, {
+            
+            const sortedLabels = Object.keys(months).sort().slice(-6);
+            const totalData = sortedLabels.map(l => months[l].total);
+            const passData = sortedLabels.map(l => months[l].pass);
+            const failData = sortedLabels.map(l => months[l].fail);
+            
+            const ctx = document.getElementById('adminChart').getContext('2d');
+            if(adminChart) adminChart.destroy();
+            adminChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(months),
+                    labels: sortedLabels,
                     datasets: [
-                        { label: '응시건수', data: Object.values(months).map(v => v.total), backgroundColor: '#cbd5e1' },
-                        { label: '이수건수', data: Object.values(months).map(v => v.pass), backgroundColor: '#00377B' }
+                        {
+                            label: '전체 응시',
+                            data: totalData,
+                            backgroundColor: '#cbd5e1',
+                            borderRadius: 6,
+                            barPercentage: 0.8,
+                        },
+                        {
+                            label: '이수 완료',
+                            data: passData,
+                            backgroundColor: '#00377B',
+                            borderRadius: 6,
+                            barPercentage: 0.8,
+                        },
+                        {
+                            label: '미이수',
+                            data: failData,
+                            backgroundColor: '#f43f5e',
+                            borderRadius: 6,
+                            barPercentage: 0.8,
+                        }
                     ]
                 },
-                options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, font: { family: 'Noto Sans KR' } },
+                            grid: { color: '#f1f5f9' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { family: 'Noto Sans KR', weight: 'bold' } }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                font: { family: 'Noto Sans KR', size: 12, weight: 'bold' }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1e293b',
+                            padding: 12,
+                            titleFont: { family: 'Noto Sans KR', size: 14 },
+                            bodyFont: { family: 'Noto Sans KR', size: 13 },
+                            cornerRadius: 12
+                        }
+                    }
+                }
             });
         }
 
-        function exportData() {
-            if (records.length === 0) return alert("데이터가 없습니다.");
-            const exportData = records.map(r => ({
-                "응시일자": new Date(r.date).toLocaleString(),
-                "성명": r.name,
-                "ID": r.id,
-                "점수": r.score,
-                "이수여부": r.isPassed ? "PASS" : "FAIL",
-                "응시횟수": r.attempt
+        function renderTable() {
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = '';
+            state.allRecords.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-4 text-slate-400 font-mono text-[10px]">${new Date(r.timestamp).toLocaleString()}</td>
+                    <td class="p-4 font-bold">${r.name}</td>
+                    <td class="p-4 text-center font-black ${r.score>=80?'text-emerald-600':'text-rose-500'}">${r.score}</td>
+                    <td class="p-4 text-center"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${r.passed?'bg-emerald-100 text-emerald-700':'bg-rose-100 text-rose-700'}">${r.passed?'PASS':'FAIL'}</span></td>
+                    <td class="p-4 text-center text-slate-400">${r.attempt||1}</td>
+                    <td class="p-4 text-slate-300 font-mono text-[10px]">${r.uid}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function exportExcel() {
+            if (state.allRecords.length === 0) return alert("데이터가 없습니다.");
+            const data = state.allRecords.map(r => ({
+                "일시": new Date(r.timestamp).toLocaleString(),
+                "성명": r.name, "점수": r.score, "결과": r.passed?"합격":"불합격", "시도": r.attempt||1, "UID": r.uid
             }));
-            const ws = XLSX.utils.json_to_sheet(exportData);
+            const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "RawData");
-            XLSX.writeFile(wb, `SDI_ULSAN_SAFETY_DATA_${new Date().toISOString().slice(0,10)}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, "ExamRecords");
+            XLSX.writeFile(wb, `SDI_RECORDS_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
-        // --- UTILS ---
-        function showStep(id) {
-            ['step-auth', 'step-quiz', 'step-result', 'step-admin-dash', 'step-admin-login'].forEach(s => {
-                document.getElementById(s).classList.add('hidden');
-            });
-            document.getElementById(id).classList.remove('hidden');
-            window.scrollTo(0,0);
-        }
-
-        function goMain() { showStep('step-auth'); document.getElementById('user-name').value=''; }
-        function showAdminLogin() { showStep('step-admin-login'); }
-        function changeAdminPw() {
-            const p = prompt("새 비밀번호 입력:");
-            if(p) { adminPassword = p; alert("변경완료."); }
-        }
-        function downloadExcelTemplate() {
-            const data = [["질문", "보기1", "보기2", "보기3", "보기4", "정답번호(0-3)"]];
+        // 양식 다운로드 함수
+        function downloadQuizTemplate() {
+            const data = [
+                ["질문", "보기1", "보기2", "보기3", "보기4", "정답(0-3)"],
+                ["전기화재 발생 시 가장 적합한 소화기는?", "K급 소화기", "이산화탄소(CO2) 소화기", "포말 소화기", "강화액 소화기", 1],
+                ["밀폐공간 출입 전 가장 먼저 측정해야 할 항목은?", "조도", "소음", "산소 및 유해가스", "습도", 2]
+            ];
             const ws = XLSX.utils.aoa_to_sheet(data);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Template");
-            XLSX.writeFile(wb, "Safety_Quiz_Template.xlsx");
+            XLSX.utils.book_append_sheet(wb, ws, "QuizBank");
+            XLSX.writeFile(wb, "SDI_Safety_Quiz_Template.xlsx");
+        }
+
+        async function importQuizExcel(input) {
+            if (!input.files[0]) return;
+            document.getElementById('file-status').innerText = "분석 중...";
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    const newQuiz = rows.slice(1).map(row => ({
+                        q: row[0], a: [row[1], row[2], row[3], row[4]], r: parseInt(row[5])
+                    })).filter(q => q.q && q.a[0]);
+
+                    const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js");
+                    await setDoc(doc(window.db, 'artifacts', window.appId, 'public', 'settings', 'quiz_bank'), { questions: newQuiz });
+                    alert(`${newQuiz.length}문항 업로드 성공`);
+                    document.getElementById('file-status').innerText = "업로드 완료";
+                } catch (err) { alert("엑셀 형식을 확인하세요."); }
+            };
+            reader.readAsArrayBuffer(input.files[0]);
+        }
+
+        async function changeAdminPassword() {
+            const newPw = document.getElementById('new-pw').value;
+            const confirmPw = document.getElementById('confirm-pw').value;
+            if (newPw.length < 4) return alert("4자 이상 입력하세요.");
+            if (newPw !== confirmPw) return alert("비밀번호가 일치하지 않습니다.");
+
+            try {
+                const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js");
+                await setDoc(doc(window.db, 'artifacts', window.appId, 'public', 'settings', 'admin_auth'), { password: newPw });
+                alert("변경 완료");
+            } catch(e) { alert("실패했습니다."); }
         }
     </script>
 </body>
