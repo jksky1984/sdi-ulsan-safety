@@ -229,7 +229,7 @@
                         <div class="bg-white p-5 rounded-2xl border shadow-sm"><span class="text-[10px] font-black text-slate-400">합격률</span><h3 id="st-rate" class="text-2xl font-black text-slate-900 mt-2">0%</h3></div>
                     </div>
 
-                    <div class="bg-white p-6 rounded-3xl border shadow-sm h-80">
+                    <div class="bg-white p-6 rounded-3xl border shadow-sm h-96">
                         <canvas id="statChart"></canvas>
                     </div>
                 </div>
@@ -379,10 +379,10 @@
         ];
 
         let db = {
-            users: JSON.parse(localStorage.getItem('sdi_db_users_v9') || '[]'),
-            history: JSON.parse(localStorage.getItem('sdi_db_history_v9') || '[]'),
-            bank: JSON.parse(localStorage.getItem('sdi_db_bank_v9') || JSON.stringify(DEFAULT_QUIZ)),
-            adminPw: localStorage.getItem('sdi_admin_pw_v9') || '1234'
+            users: JSON.parse(localStorage.getItem('sdi_db_users_v10') || '[]'),
+            history: JSON.parse(localStorage.getItem('sdi_db_history_v10') || '[]'),
+            bank: JSON.parse(localStorage.getItem('sdi_db_bank_v10') || JSON.stringify(DEFAULT_QUIZ)),
+            adminPw: localStorage.getItem('sdi_admin_pw_v10') || '1234'
         };
 
         let state = { user: null, quizSet: [], currIdx: 0, answers: [], chart: null, pendingDelete: [] };
@@ -390,10 +390,10 @@
         window.onload = () => { lucide.createIcons(); initFilters(); resetToHome(); };
 
         function saveDB() {
-            localStorage.setItem('sdi_db_users_v9', JSON.stringify(db.users));
-            localStorage.setItem('sdi_db_history_v9', JSON.stringify(db.history));
-            localStorage.setItem('sdi_db_bank_v9', JSON.stringify(db.bank));
-            localStorage.setItem('sdi_admin_pw_v9', db.adminPw);
+            localStorage.setItem('sdi_db_users_v10', JSON.stringify(db.users));
+            localStorage.setItem('sdi_db_history_v10', JSON.stringify(db.history));
+            localStorage.setItem('sdi_db_bank_v10', JSON.stringify(db.bank));
+            localStorage.setItem('sdi_admin_pw_v10', db.adminPw);
         }
 
         function toast(msg) {
@@ -424,7 +424,6 @@
             const name = document.getElementById('input-name').value.trim();
             if(!name) return toast('성명을 입력하세요.');
             state.user = { name, ts: Date.now(), id: 'SDI-' + Math.random().toString(36).substr(2,6).toUpperCase() };
-            // 문제은행에서 10문제 랜덤 추출
             state.quizSet = [...db.bank].sort(() => Math.random() - 0.5).slice(0, 10);
             if(state.quizSet.length < 10) { toast('문제은행의 문제가 부족합니다. (최소 10문항 필요)'); return; }
             state.currIdx = 0; state.answers = Array(10).fill(null);
@@ -507,51 +506,124 @@
             if(tab === 'bank') renderBankTable();
         }
 
+        // --- Statistics Rendering ---
         function renderStats() {
             const selYear = parseInt(document.getElementById('filter-year').value);
             const selMonth = document.getElementById('filter-month').value;
-            let filtered = db.users.filter(u => new Date(u.ts).getFullYear() === selYear);
-            if(selMonth !== 'all') filtered = filtered.filter(u => new Date(u.ts).getMonth() === parseInt(selMonth));
+            
+            // 데이터 필터링
+            let filteredAll = db.users.filter(u => new Date(u.ts).getFullYear() === selYear);
+            let summaryFiltered = [...filteredAll];
+            if(selMonth !== 'all') summaryFiltered = summaryFiltered.filter(u => new Date(u.ts).getMonth() === parseInt(selMonth));
 
-            const total = filtered.length;
-            const pass = filtered.filter(u => u.passed).length;
-            const fail = total - pass;
-            const rate = total > 0 ? Math.round((pass/total)*100) : 0;
+            // 상단 요약 카드
+            const total = summaryFiltered.length;
+            const passTotal = summaryFiltered.filter(u => u.passed).length;
+            const failTotal = total - passTotal;
+            const rateTotal = total > 0 ? Math.round((passTotal/total)*100) : 0;
 
             document.getElementById('st-total').innerText = total;
-            document.getElementById('st-pass').innerText = pass;
-            document.getElementById('st-fail').innerText = fail;
-            document.getElementById('st-rate').innerText = rate + '%';
+            document.getElementById('st-pass').innerText = passTotal;
+            document.getElementById('st-fail').innerText = failTotal;
+            document.getElementById('st-rate').innerText = rateTotal + '%';
 
-            const monthlyData = Array(12).fill(0);
-            db.users.filter(u => new Date(u.ts).getFullYear() === selYear).forEach(u => monthlyData[new Date(u.ts).getMonth()]++);
+            // 그래프 데이터 준비 (월별 합격/불합격)
+            const passData = Array(12).fill(0);
+            const failData = Array(12).fill(0);
+            const rateData = Array(12).fill(0);
+
+            filteredAll.forEach(u => {
+                const m = new Date(u.ts).getMonth();
+                if(u.passed) passData[m]++; else failData[m]++;
+            });
+
+            for(let i=0; i<12; i++) {
+                const monthTotal = passData[i] + failData[i];
+                rateData[i] = monthTotal > 0 ? Math.round((passData[i]/monthTotal)*100) : 0;
+            }
+
+            // 하이라이트 투명도 계산
+            const getAlpha = (idx) => {
+                if(selMonth === 'all') return 1;
+                return parseInt(selMonth) === idx ? 1 : 0.2;
+            };
 
             const ctx = document.getElementById('statChart').getContext('2d');
             if(state.chart) state.chart.destroy();
+            
             state.chart = new Chart(ctx, {
-                type: 'line',
+                type: 'bar',
                 data: {
                     labels: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
-                    datasets: [{
-                        label: '응시건수',
-                        data: monthlyData,
-                        borderColor: '#1428A0',
-                        backgroundColor: 'rgba(20, 40, 160, 0.05)',
-                        borderWidth: 3,
-                        fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: '#1428A0'
-                    }]
+                    datasets: [
+                        {
+                            label: '이수자',
+                            data: passData,
+                            backgroundColor: passData.map((_, i) => `rgba(20, 40, 160, ${getAlpha(i)})`),
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            barPercentage: 0.8,
+                            categoryPercentage: 0.6
+                        },
+                        {
+                            label: '미이수자',
+                            data: failData,
+                            backgroundColor: failData.map((_, i) => `rgba(244, 63, 94, ${getAlpha(i)})`),
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            barPercentage: 0.8,
+                            categoryPercentage: 0.6
+                        }
+                    ]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10, weight: 'bold' } } },
+                        tooltip: { backgroundColor: '#1e293b', titleFont: { size: 12 }, bodyFont: { size: 11 }, padding: 12, cornerRadius: 10 }
+                    },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { stepSize: 1, font: { size: 9 } } },
-                        x: { grid: { display: false }, ticks: { font: { size: 9 } } }
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: '#f1f5f9', drawBorder: false }, 
+                            ticks: { stepSize: 1, font: { size: 9 }, color: '#94a3b8' } 
+                        },
+                        x: { 
+                            grid: { display: false }, 
+                            ticks: { font: { size: 10, weight: 'bold' }, color: '#64748b' } 
+                        }
+                    },
+                    // 합격률 커스텀 렌더링
+                    animation: {
+                        onComplete: function() {
+                            const chartInstance = this;
+                            const ctx = chartInstance.ctx;
+                            ctx.font = 'bold 9px Pretendard';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+
+                            chartInstance.data.datasets[0].data.forEach((data, index) => {
+                                const mTotal = passData[index] + failData[index];
+                                if (mTotal > 0) {
+                                    const meta0 = chartInstance.getDatasetMeta(0);
+                                    const meta1 = chartInstance.getDatasetMeta(1);
+                                    const x0 = meta0.data[index].x;
+                                    const x1 = meta1.data[index].x;
+                                    const y = Math.min(meta0.data[index].y, meta1.data[index].y);
+                                    
+                                    const alpha = getAlpha(index);
+                                    ctx.fillStyle = `rgba(148, 163, 184, ${alpha * 0.8})`;
+                                    ctx.fillText(`${rateData[index]}%`, (x0 + x1) / 2, y - 5);
+                                }
+                            });
+                        }
                     }
                 }
             });
         }
 
+        // --- Other Admin Functions ---
         function renderUserTable() {
             const tbody = document.getElementById('user-table');
             tbody.innerHTML = '';
@@ -614,7 +686,6 @@
             });
         }
 
-        // --- Bank Management ---
         function renderBankTable() {
             const tbody = document.getElementById('bank-table');
             tbody.innerHTML = '';
@@ -646,38 +717,24 @@
                 const workbook = XLSX.read(data, { type: 'array' });
                 const ws = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-                
-                // 데이터 파싱 (첫 줄 헤더 제외)
                 const newBank = rows.slice(1).filter(r => r[0] && r[5]).map(r => ({
-                    q: r[0],
-                    a: [r[1], r[2], r[3], r[4]].filter(v => v),
-                    c: parseInt(r[5])
+                    q: r[0], a: [r[1], r[2], r[3], r[4]].filter(v => v), c: parseInt(r[5])
                 }));
-
                 if(newBank.length < 10) { toast('최소 10문항 이상 업로드해야 합니다.'); return; }
-                
-                db.bank = newBank;
-                saveDB();
-                renderBankTable();
-                toast('문제은행이 업데이트되었습니다.');
+                db.bank = newBank; saveDB(); renderBankTable(); toast('문제은행이 업데이트되었습니다.');
                 input.value = '';
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // --- Settings ---
         function changePassword() {
             const cur = document.getElementById('pw-current').value;
             const n1 = document.getElementById('pw-new').value;
             const n2 = document.getElementById('pw-confirm').value;
-
             if(cur !== db.adminPw) return toast('현재 비밀번호가 올바르지 않습니다.');
             if(n1 !== n2) return toast('새 비밀번호 확인이 일치하지 않습니다.');
             if(n1.length < 4) return toast('비밀번호는 4자 이상이어야 합니다.');
-
-            db.adminPw = n1;
-            saveDB();
-            toast('비밀번호가 성공적으로 변경되었습니다.');
+            db.adminPw = n1; saveDB(); toast('비밀번호가 성공적으로 변경되었습니다.');
             document.querySelectorAll('#atab-settings input').forEach(i => i.value = '');
         }
 
